@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,11 @@ export default function TradeDetailModal({
 }: TradeDetailModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullImage, setShowFullImage] = useState(false);
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    setShowFullImage(false);
+  }, [trade?.id]);
 
   if (!trade) return null;
 
