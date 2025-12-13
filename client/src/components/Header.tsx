@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Moon, Sun, TrendingUp } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 
-type Tab = "dashboard" | "operations" | "new-entry" | "settings";
+type Tab = "new-entry" | "operations" | "calendario" | "statistiche" | "settings";
 
 interface HeaderProps {
   activeTab: Tab;
@@ -10,9 +10,10 @@ interface HeaderProps {
 }
 
 const tabs: { id: Tab; label: string }[] = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "operations", label: "Operazioni" },
   { id: "new-entry", label: "Nuova Operazione" },
+  { id: "operations", label: "Operazioni" },
+  { id: "calendario", label: "Calendario" },
+  { id: "statistiche", label: "Statistiche" },
   { id: "settings", label: "Impostazioni" },
 ];
 

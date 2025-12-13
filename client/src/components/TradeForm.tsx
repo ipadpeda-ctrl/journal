@@ -22,6 +22,8 @@ interface TradeFormProps {
   onDuplicate?: () => void;
 }
 
+export type TradeResult = "target" | "stop_loss" | "breakeven" | "parziale" | "non_fillato";
+
 export interface TradeFormData {
   date: string;
   time: string;
@@ -29,7 +31,7 @@ export interface TradeFormData {
   direction: "long" | "short";
   target: string;
   stopLoss: string;
-  result: "target" | "stop_loss" | "breakeven";
+  result: TradeResult;
   emotion: string;
   confluencesPro: string[];
   confluencesContro: string[];

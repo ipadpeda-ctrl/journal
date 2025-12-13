@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowUp, ArrowDown, Pencil, Trash2, Search, Filter } from "lucide-react";
 import ConfluenceTag from "./ConfluenceTag";
 
+export type TradeResult = "target" | "stop_loss" | "breakeven" | "parziale" | "non_fillato";
+
 export interface Trade {
   id: string;
   date: string;
@@ -29,7 +31,7 @@ export interface Trade {
   direction: "long" | "short";
   target: number;
   stopLoss: number;
-  result: "target" | "stop_loss" | "breakeven";
+  result: TradeResult;
   emotion: string;
   confluencesPro: string[];
   confluencesContro: string[];
@@ -65,6 +67,10 @@ export default function TradesTable({ trades, onEdit, onDelete }: TradesTablePro
         return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Stop Loss</Badge>;
       case "breakeven":
         return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Breakeven</Badge>;
+      case "parziale":
+        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Parziale</Badge>;
+      case "non_fillato":
+        return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Non Fillato</Badge>;
     }
   };
 
@@ -104,6 +110,8 @@ export default function TradesTable({ trades, onEdit, onDelete }: TradesTablePro
               <SelectItem value="target">Target</SelectItem>
               <SelectItem value="stop_loss">Stop Loss</SelectItem>
               <SelectItem value="breakeven">Breakeven</SelectItem>
+              <SelectItem value="parziale">Parziale</SelectItem>
+              <SelectItem value="non_fillato">Non Fillato</SelectItem>
             </SelectContent>
           </Select>
         </div>

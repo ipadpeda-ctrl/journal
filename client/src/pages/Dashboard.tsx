@@ -4,13 +4,17 @@ import StatCard from "@/components/StatCard";
 import TradeForm, { TradeFormData } from "@/components/TradeForm";
 import TradesTable, { Trade } from "@/components/TradesTable";
 import {
-  TradeDistributionChart,
-  DirectionChart,
-  WinRateChart,
   EquityCurveChart,
-  EmotionalFrequencyChart,
 } from "@/components/Charts";
 import Settings from "@/components/Settings";
+import Calendar from "@/components/Calendar";
+import WeeklyRecap from "@/components/WeeklyRecap";
+import ResultBreakdownCard from "@/components/ResultBreakdownCard";
+import MoodTracker from "@/components/MoodTracker";
+import ConfluenceStats from "@/components/ConfluenceStats";
+import MetricsCards from "@/components/MetricsCards";
+import { PerformanceByPair, TradeCountDonut, DirectionBreakdown } from "@/components/PerformanceCharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // todo: remove mock functionality
 const initialTrades: Trade[] = [
@@ -87,7 +91,7 @@ const initialTrades: Trade[] = [
     direction: "short",
     target: 2.5,
     stopLoss: 0.8,
-    result: "target",
+    result: "parziale",
     emotion: "Neutrale",
     confluencesPro: ["Pattern chiaro", "Volume alto"],
     confluencesContro: ["Orario sfavorevole"],
@@ -118,6 +122,32 @@ const initialTrades: Trade[] = [
     confluencesPro: ["Trend forte", "Volume alto", "Livello chiave"],
     confluencesContro: [],
   },
+  {
+    id: "9",
+    date: "2024-12-13",
+    time: "08:30",
+    pair: "GBPUSD",
+    direction: "short",
+    target: 2.0,
+    stopLoss: 0.6,
+    result: "non_fillato",
+    emotion: "Neutrale",
+    confluencesPro: ["Pattern chiaro", "Trend forte"],
+    confluencesContro: [],
+  },
+  {
+    id: "10",
+    date: "2024-12-13",
+    time: "11:45",
+    pair: "USDJPY",
+    direction: "long",
+    target: 1.8,
+    stopLoss: 0.5,
+    result: "parziale",
+    emotion: "Fiducioso",
+    confluencesPro: ["Livello chiave", "Volume alto"],
+    confluencesContro: ["Orario sfavorevole"],
+  },
 ];
 
 const defaultPairs = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
@@ -126,8 +156,9 @@ const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto",
 const defaultConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [activeTab, setActiveTab] = useState<Tab>("new-entry");
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const stats = {
     totalOperations: trades.length,
@@ -138,25 +169,7 @@ export default function Dashboard() {
     totalEquity: calculateEquity(trades),
   };
 
-  const tradeDistribution = {
-    target: trades.filter((t) => t.result === "target").length,
-    stopLoss: trades.filter((t) => t.result === "stop_loss").length,
-    breakeven: trades.filter((t) => t.result === "breakeven").length,
-  };
-
-  const directionData = {
-    long: trades.filter((t) => t.direction === "long").length,
-    short: trades.filter((t) => t.direction === "short").length,
-  };
-
-  const winRateData = {
-    wins: trades.filter((t) => t.result === "target").length,
-    losses: trades.filter((t) => t.result === "stop_loss").length,
-  };
-
   const equityData = calculateEquityCurve(trades);
-
-  const emotionData = calculateEmotionFrequency(trades);
 
   const handleSubmitTrade = (formData: TradeFormData) => {
     const newTrade: Trade = {
@@ -180,37 +193,153 @@ export default function Dashboard() {
     setTrades((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Calculate result breakdown data
+  const resultBreakdownData = {
+    target: {
+      total: trades.filter((t) => t.result === "target").length,
+      long: trades.filter((t) => t.result === "target" && t.direction === "long").length,
+      short: trades.filter((t) => t.result === "target" && t.direction === "short").length,
+    },
+    stopLoss: {
+      total: trades.filter((t) => t.result === "stop_loss").length,
+      long: trades.filter((t) => t.result === "stop_loss" && t.direction === "long").length,
+      short: trades.filter((t) => t.result === "stop_loss" && t.direction === "short").length,
+    },
+    breakeven: {
+      total: trades.filter((t) => t.result === "breakeven").length,
+      long: trades.filter((t) => t.result === "breakeven" && t.direction === "long").length,
+      short: trades.filter((t) => t.result === "breakeven" && t.direction === "short").length,
+    },
+    parziale: {
+      total: trades.filter((t) => t.result === "parziale").length,
+      long: trades.filter((t) => t.result === "parziale" && t.direction === "long").length,
+      short: trades.filter((t) => t.result === "parziale" && t.direction === "short").length,
+    },
+  };
+
+  // Calculate metrics
+  const metricsData = calculateMetrics(trades);
+
+  // Calculate mood data
+  const moodData = calculateMoodData(trades);
+
+  // Calculate confluence stats
+  const { confluencesPro, confluencesContro } = calculateConfluenceStats(trades);
+
+  // Calculate performance by pair
+  const performanceByPair = calculatePerformanceByPair(trades);
+
+  // Calculate direction breakdown
+  const directionBreakdown = {
+    longWins: trades.filter((t) => t.direction === "long" && t.result === "target").length,
+    longLosses: trades.filter((t) => t.direction === "long" && t.result === "stop_loss").length,
+    shortWins: trades.filter((t) => t.direction === "short" && t.result === "target").length,
+    shortLosses: trades.filter((t) => t.direction === "short" && t.result === "stop_loss").length,
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header activeTab={activeTab} onTabChange={setActiveTab} />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {activeTab === "dashboard" && (
+        {activeTab === "statistiche" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard label="Operazioni Totali" value={stats.totalOperations} />
-              <StatCard
-                label="Win Rate"
-                value={`${stats.winRate}%`}
-                trend={parseFloat(stats.winRate) >= 50 ? "up" : "down"}
-              />
-              <StatCard
-                label="Profit Factor"
-                value={stats.profitFactor}
-                trend={parseFloat(stats.profitFactor) >= 1 ? "up" : "down"}
-              />
-              <StatCard label="Equity Totale" value={stats.totalEquity} subValue="EUR" />
-            </div>
-
+            {/* Row 1: Direction Breakdown + Win Rate + Risultato Finale */}
             <div className="grid lg:grid-cols-3 gap-6">
-              <TradeDistributionChart data={tradeDistribution} />
-              <DirectionChart data={directionData} />
-              <WinRateChart data={winRateData} />
+              <DirectionBreakdown data={directionBreakdown} />
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold" data-testid="text-winrate-value">{stats.winRate}%</div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {trades.filter((t) => t.result === "target").length} vincenti su {trades.length} totali
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Risultato Finale</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-3xl font-bold ${parseFloat(stats.totalEquity) >= 1000 ? "text-emerald-500" : "text-red-500"}`} data-testid="text-equity-value">
+                    {parseFloat(stats.totalEquity) >= 1000 ? "+" : ""}{(parseFloat(stats.totalEquity) - 1000).toFixed(2)} EUR
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Equity totale: {stats.totalEquity} EUR
+                  </p>
+                </CardContent>
+              </Card>
             </div>
 
-            <EquityCurveChart data={equityData} />
+            {/* Row 2: Trade Count Donut + Performance by Pair */}
+            <div className="grid lg:grid-cols-2 gap-6">
+              <TradeCountDonut trades={trades} />
+              <PerformanceByPair data={performanceByPair} />
+            </div>
 
-            <EmotionalFrequencyChart data={emotionData} />
+            {/* Row 3: Metrics Cards */}
+            <MetricsCards data={metricsData} />
+
+            {/* Row 4: Result Breakdown Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <ResultBreakdownCard
+                title="Take Profit"
+                total={resultBreakdownData.target.total}
+                long={resultBreakdownData.target.long}
+                short={resultBreakdownData.target.short}
+                color="emerald"
+              />
+              <ResultBreakdownCard
+                title="Stop Loss"
+                total={resultBreakdownData.stopLoss.total}
+                long={resultBreakdownData.stopLoss.long}
+                short={resultBreakdownData.stopLoss.short}
+                color="red"
+              />
+              <ResultBreakdownCard
+                title="Breakeven"
+                total={resultBreakdownData.breakeven.total}
+                long={resultBreakdownData.breakeven.long}
+                short={resultBreakdownData.breakeven.short}
+                color="yellow"
+              />
+              <ResultBreakdownCard
+                title="Parziali"
+                total={resultBreakdownData.parziale.total}
+                long={resultBreakdownData.parziale.long}
+                short={resultBreakdownData.parziale.short}
+                color="blue"
+              />
+            </div>
+
+            {/* Row 5: Mood Tracker */}
+            <MoodTracker data={moodData} />
+
+            {/* Row 6: Confluence Stats */}
+            <div className="grid lg:grid-cols-2 gap-6">
+              <ConfluenceStats title="Confluenze PRO" data={confluencesPro} />
+              <ConfluenceStats title="Confluenze CONTRO" data={confluencesContro} />
+            </div>
+
+            {/* Row 7: Equity Curve */}
+            <EquityCurveChart data={equityData} />
+          </div>
+        )}
+
+        {activeTab === "calendario" && (
+          <div className="flex gap-6">
+            <div className="flex-1">
+              <Calendar
+                trades={trades}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+              />
+            </div>
+            <div className="w-80 flex-shrink-0">
+              <WeeklyRecap trades={trades} selectedDate={selectedDate} />
+            </div>
           </div>
         )}
 
@@ -258,6 +387,8 @@ function calculateEquity(trades: Trade[]): string {
       equity += trade.target * 100;
     } else if (trade.result === "stop_loss") {
       equity -= trade.stopLoss * 100;
+    } else if (trade.result === "parziale") {
+      equity += (trade.target * 0.5) * 100;
     }
   }
   return equity.toFixed(2);
@@ -278,6 +409,8 @@ function calculateEquityCurve(trades: Trade[]): { date: string; equity: number }
       equity += trade.target * 100;
     } else if (trade.result === "stop_loss") {
       equity -= trade.stopLoss * 100;
+    } else if (trade.result === "parziale") {
+      equity += (trade.target * 0.5) * 100;
     }
     curve.push({
       date: trade.date.slice(5),
@@ -288,17 +421,108 @@ function calculateEquityCurve(trades: Trade[]): { date: string; equity: number }
   return curve;
 }
 
-function calculateEmotionFrequency(trades: Trade[]): { emotion: string; count: number }[] {
-  const emotionCounts: Record<string, number> = {};
+function calculateMetrics(trades: Trade[]) {
+  const wins = trades.filter((t) => t.result === "target");
+  const losses = trades.filter((t) => t.result === "stop_loss");
+  const partials = trades.filter((t) => t.result === "parziale");
   
-  for (const trade of trades) {
-    emotionCounts[trade.emotion] = (emotionCounts[trade.emotion] || 0) + 1;
-  }
+  const totalWins = wins.reduce((sum, t) => sum + t.target, 0);
+  const totalLosses = losses.reduce((sum, t) => sum + t.stopLoss, 0);
+  const totalPartials = partials.reduce((sum, t) => sum + t.target * 0.5, 0);
+  
+  const profitFactor = totalLosses > 0 ? (totalWins + totalPartials) / totalLosses : 0;
+  
+  const avgWin = wins.length > 0 ? totalWins / wins.length : 0;
+  const avgLoss = losses.length > 0 ? totalLosses / losses.length : 0;
+  const riskReward = avgLoss > 0 ? avgWin / avgLoss : 0;
+  
+  const winRate = trades.length > 0 ? (wins.length + partials.length * 0.5) / trades.length : 0;
+  const expectancy = (winRate * avgWin) - ((1 - winRate) * avgLoss);
 
+  return {
+    profitFactor: profitFactor.toFixed(2),
+    riskReward: riskReward.toFixed(2),
+    expectancy: expectancy.toFixed(2),
+    avgLoss: avgLoss.toFixed(2),
+  };
+}
+
+function calculateMoodData(trades: Trade[]) {
   const allEmotions = ["FOMO", "Rabbia", "Neutrale", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
   
-  return allEmotions.map((emotion) => ({
-    emotion,
-    count: emotionCounts[emotion] || 0,
-  }));
+  return allEmotions.map((emotion) => {
+    const emotionTrades = trades.filter((t) => t.emotion === emotion);
+    const count = emotionTrades.length;
+    const wins = emotionTrades.filter((t) => t.result === "target").length;
+    const winRate = count > 0 ? (wins / count) * 100 : 0;
+    
+    return {
+      emotion,
+      count,
+      winRate,
+    };
+  });
+}
+
+function calculateConfluenceStats(trades: Trade[]) {
+  const allConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
+  const allConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
+  
+  const confluencesPro = allConfluencesPro.map((conf) => {
+    const confTrades = trades.filter((t) => t.confluencesPro.includes(conf));
+    const count = confTrades.length;
+    const wins = confTrades.filter((t) => t.result === "target").length;
+    const losses = confTrades.filter((t) => t.result === "stop_loss").length;
+    const winRate = count > 0 ? (wins / count) * 100 : 0;
+    
+    return {
+      name: conf,
+      count,
+      wins,
+      losses,
+      winRate,
+    };
+  });
+  
+  const confluencesContro = allConfluencesContro.map((conf) => {
+    const confTrades = trades.filter((t) => t.confluencesContro.includes(conf));
+    const count = confTrades.length;
+    const wins = confTrades.filter((t) => t.result === "target").length;
+    const losses = confTrades.filter((t) => t.result === "stop_loss").length;
+    const winRate = count > 0 ? (wins / count) * 100 : 0;
+    
+    return {
+      name: conf,
+      count,
+      wins,
+      losses,
+      winRate,
+    };
+  });
+
+  return { confluencesPro, confluencesContro };
+}
+
+function calculatePerformanceByPair(trades: Trade[]) {
+  const pairs = Array.from(new Set(trades.map((t) => t.pair)));
+  
+  return pairs.map((pair) => {
+    const pairTrades = trades.filter((t) => t.pair === pair);
+    const wins = pairTrades.filter((t) => t.result === "target").length;
+    const losses = pairTrades.filter((t) => t.result === "stop_loss").length;
+    const pnl = pairTrades.reduce((sum, t) => {
+      if (t.result === "target") return sum + t.target;
+      if (t.result === "stop_loss") return sum - t.stopLoss;
+      if (t.result === "parziale") return sum + t.target * 0.5;
+      return sum;
+    }, 0);
+    
+    return {
+      pair,
+      trades: pairTrades.length,
+      wins,
+      losses,
+      pnl: pnl * 100,
+    };
+  });
 }
