@@ -43,6 +43,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
 
   const stats = {
     totalOperations: trades.length,
@@ -56,23 +57,59 @@ export default function Dashboard() {
   const equityData = calculateEquityCurve(trades);
 
   const handleSubmitTrade = (formData: TradeFormData) => {
-    const newTrade: Trade = {
-      id: Date.now().toString(),
-      date: formData.date,
-      time: formData.time,
-      pair: formData.pair,
-      direction: formData.direction,
-      target: parseFloat(formData.target) || 0,
-      stopLoss: parseFloat(formData.stopLoss) || 0,
-      result: formData.result,
-      emotion: formData.emotion,
-      confluencesPro: formData.confluencesPro,
-      confluencesContro: formData.confluencesContro,
-      imageUrls: formData.imageUrls,
-      notes: formData.notes,
-    };
-    setTrades((prev) => [...prev, newTrade]);
-    setActiveTab("operations");
+    if (editingTrade) {
+      setTrades((prev) =>
+        prev.map((t) =>
+          t.id === editingTrade.id
+            ? {
+                ...t,
+                date: formData.date,
+                time: formData.time,
+                pair: formData.pair,
+                direction: formData.direction,
+                target: parseFloat(formData.target) || 0,
+                stopLoss: parseFloat(formData.stopLoss) || 0,
+                result: formData.result,
+                emotion: formData.emotion,
+                confluencesPro: formData.confluencesPro,
+                confluencesContro: formData.confluencesContro,
+                imageUrls: formData.imageUrls,
+                notes: formData.notes,
+              }
+            : t
+        )
+      );
+      setEditingTrade(null);
+      setActiveTab("operations");
+    } else {
+      const newTrade: Trade = {
+        id: Date.now().toString(),
+        date: formData.date,
+        time: formData.time,
+        pair: formData.pair,
+        direction: formData.direction,
+        target: parseFloat(formData.target) || 0,
+        stopLoss: parseFloat(formData.stopLoss) || 0,
+        result: formData.result,
+        emotion: formData.emotion,
+        confluencesPro: formData.confluencesPro,
+        confluencesContro: formData.confluencesContro,
+        imageUrls: formData.imageUrls,
+        notes: formData.notes,
+      };
+      setTrades((prev) => [...prev, newTrade]);
+      setActiveTab("operations");
+    }
+  };
+
+  const handleEditTrade = (trade: Trade) => {
+    setEditingTrade(trade);
+    setIsDetailModalOpen(false);
+    setActiveTab("new-entry");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTrade(null);
   };
 
   const handleRowClick = (trade: Trade) => {
@@ -82,6 +119,9 @@ export default function Dashboard() {
 
   const handleDeleteTrade = (id: string) => {
     setTrades((prev) => prev.filter((t) => t.id !== id));
+    if (editingTrade?.id === id) {
+      setEditingTrade(null);
+    }
   };
 
   // Calculate result breakdown data
@@ -236,7 +276,7 @@ export default function Dashboard() {
           <>
             <TradesTable
               trades={trades}
-              onEdit={(trade) => console.log("Edit:", trade)}
+              onEdit={handleEditTrade}
               onDelete={handleDeleteTrade}
               onRowClick={handleRowClick}
             />
@@ -244,14 +284,33 @@ export default function Dashboard() {
               trade={selectedTrade}
               open={isDetailModalOpen}
               onOpenChange={setIsDetailModalOpen}
-              onEdit={(trade) => console.log("Edit:", trade)}
+              onEdit={handleEditTrade}
               onDelete={handleDeleteTrade}
             />
           </>
         )}
 
         {activeTab === "new-entry" && (
-          <TradeForm onSubmit={handleSubmitTrade} onDuplicate={() => console.log("Duplicate")} />
+          <TradeForm
+            onSubmit={handleSubmitTrade}
+            onDuplicate={() => console.log("Duplicate")}
+            editingTrade={editingTrade ? {
+              id: editingTrade.id,
+              date: editingTrade.date,
+              time: editingTrade.time,
+              pair: editingTrade.pair,
+              direction: editingTrade.direction,
+              target: editingTrade.target.toString(),
+              stopLoss: editingTrade.stopLoss.toString(),
+              result: editingTrade.result,
+              emotion: editingTrade.emotion,
+              confluencesPro: editingTrade.confluencesPro,
+              confluencesContro: editingTrade.confluencesContro,
+              imageUrls: editingTrade.imageUrls,
+              notes: editingTrade.notes,
+            } : undefined}
+            onCancelEdit={handleCancelEdit}
+          />
         )}
 
         {activeTab === "settings" && (

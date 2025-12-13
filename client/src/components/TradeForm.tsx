@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ const EMOTIONS = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "Fiducio
 interface TradeFormProps {
   onSubmit?: (trade: TradeFormData) => void;
   onDuplicate?: () => void;
+  editingTrade?: TradeFormData & { id?: string };
+  onCancelEdit?: () => void;
 }
 
 export type TradeResult = "target" | "stop_loss" | "breakeven" | "parziale" | "non_fillato";
@@ -43,21 +45,45 @@ export interface TradeFormData {
 const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
 const defaultConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
 
-export default function TradeForm({ onSubmit, onDuplicate }: TradeFormProps) {
-  const [formData, setFormData] = useState<TradeFormData>({
-    date: new Date().toISOString().split("T")[0],
-    time: new Date().toTimeString().slice(0, 5),
-    pair: "",
-    direction: "long",
-    target: "",
-    stopLoss: "",
-    result: "target",
-    emotion: "Neutrale",
-    confluencesPro: [],
-    confluencesContro: [],
-    imageUrls: [],
-    notes: "",
-  });
+export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCancelEdit }: TradeFormProps) {
+  const getInitialFormData = (): TradeFormData => {
+    if (editingTrade) {
+      return {
+        date: editingTrade.date,
+        time: editingTrade.time,
+        pair: editingTrade.pair,
+        direction: editingTrade.direction,
+        target: editingTrade.target,
+        stopLoss: editingTrade.stopLoss,
+        result: editingTrade.result,
+        emotion: editingTrade.emotion,
+        confluencesPro: editingTrade.confluencesPro,
+        confluencesContro: editingTrade.confluencesContro,
+        imageUrls: editingTrade.imageUrls,
+        notes: editingTrade.notes,
+      };
+    }
+    return {
+      date: new Date().toISOString().split("T")[0],
+      time: new Date().toTimeString().slice(0, 5),
+      pair: "",
+      direction: "long",
+      target: "",
+      stopLoss: "",
+      result: "target",
+      emotion: "Neutrale",
+      confluencesPro: [],
+      confluencesContro: [],
+      imageUrls: [],
+      notes: "",
+    };
+  };
+
+  const [formData, setFormData] = useState<TradeFormData>(getInitialFormData);
+
+  useEffect(() => {
+    setFormData(getInitialFormData());
+  }, [editingTrade?.id]);
 
   const [newProTag, setNewProTag] = useState("");
   const [newControTag, setNewControTag] = useState("");
@@ -106,17 +132,19 @@ export default function TradeForm({ onSubmit, onDuplicate }: TradeFormProps) {
     <Card className="p-6">
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="text-lg font-medium">Nuova Operazione</h2>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onDuplicate}
-            data-testid="button-duplicate-trade"
-          >
-            <Copy className="w-4 h-4 mr-2" />
-            Duplica Ultima
-          </Button>
+          <h2 className="text-lg font-medium">{editingTrade ? "Modifica Operazione" : "Nuova Operazione"}</h2>
+          {!editingTrade && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onDuplicate}
+              data-testid="button-duplicate-trade"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Duplica Ultima
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -428,8 +456,13 @@ export default function TradeForm({ onSubmit, onDuplicate }: TradeFormProps) {
         </div>
 
         <div className="flex justify-end gap-2 pt-4">
+          {editingTrade && (
+            <Button type="button" variant="outline" onClick={onCancelEdit} data-testid="button-cancel-edit">
+              Annulla
+            </Button>
+          )}
           <Button type="submit" data-testid="button-submit-trade">
-            Salva Operazione
+            {editingTrade ? "Salva Modifiche" : "Salva Operazione"}
           </Button>
         </div>
       </form>
