@@ -3,6 +3,7 @@ import Header, { Tab } from "@/components/Header";
 import StatCard from "@/components/StatCard";
 import TradeForm, { TradeFormData } from "@/components/TradeForm";
 import TradesTable, { Trade } from "@/components/TradesTable";
+import TradeDetailModal from "@/components/TradeDetailModal";
 import {
   EquityCurveChart,
 } from "@/components/Charts";
@@ -14,140 +15,21 @@ import MoodTracker from "@/components/MoodTracker";
 import ConfluenceStats from "@/components/ConfluenceStats";
 import MetricsCards from "@/components/MetricsCards";
 import { PerformanceByPair, TradeCountDonut, DirectionBreakdown } from "@/components/PerformanceCharts";
+import EquityProjection from "@/components/EquityProjection";
+import RiskOfRuinTable from "@/components/RiskOfRuinTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// todo: remove mock functionality
 const initialTrades: Trade[] = [
-  {
-    id: "1",
-    date: "2024-12-07",
-    time: "09:30",
-    pair: "EURUSD",
-    direction: "long",
-    target: 1.75,
-    stopLoss: 0.5,
-    result: "target",
-    emotion: "Fiducioso",
-    confluencesPro: ["Trend forte", "Supporto testato"],
-    confluencesContro: ["Notizie in arrivo"],
-  },
-  {
-    id: "2",
-    date: "2024-12-08",
-    time: "14:15",
-    pair: "GBPUSD",
-    direction: "short",
-    target: 1.5,
-    stopLoss: 0.75,
-    result: "stop_loss",
-    emotion: "FOMO",
-    confluencesPro: ["Pattern chiaro"],
-    confluencesContro: ["Contro trend", "Bassa liquidità"],
-  },
-  {
-    id: "3",
-    date: "2024-12-09",
-    time: "10:00",
-    pair: "USDJPY",
-    direction: "long",
-    target: 2.0,
-    stopLoss: 0.6,
-    result: "breakeven",
-    emotion: "Neutrale",
-    confluencesPro: ["Volume alto", "Livello chiave"],
-    confluencesContro: [],
-  },
-  {
-    id: "4",
-    date: "2024-12-10",
-    time: "16:45",
-    pair: "EURUSD",
-    direction: "short",
-    target: 1.25,
-    stopLoss: 0.4,
-    result: "target",
-    emotion: "Sicuro",
-    confluencesPro: ["Trend forte", "Pattern chiaro", "Volume alto"],
-    confluencesContro: ["Orario sfavorevole"],
-  },
-  {
-    id: "5",
-    date: "2024-12-11",
-    time: "11:20",
-    pair: "XAUUSD",
-    direction: "long",
-    target: 3.0,
-    stopLoss: 1.0,
-    result: "target",
-    emotion: "Fiducioso",
-    confluencesPro: ["Trend forte", "Livello chiave"],
-    confluencesContro: [],
-  },
-  {
-    id: "6",
-    date: "2024-12-11",
-    time: "15:30",
-    pair: "GBPJPY",
-    direction: "short",
-    target: 2.5,
-    stopLoss: 0.8,
-    result: "parziale",
-    emotion: "Neutrale",
-    confluencesPro: ["Pattern chiaro", "Volume alto"],
-    confluencesContro: ["Orario sfavorevole"],
-  },
-  {
-    id: "7",
-    date: "2024-12-12",
-    time: "09:00",
-    pair: "USDCAD",
-    direction: "long",
-    target: 1.5,
-    stopLoss: 0.5,
-    result: "stop_loss",
-    emotion: "Impaziente",
-    confluencesPro: ["Supporto testato"],
-    confluencesContro: ["Notizie in arrivo", "Pattern debole"],
-  },
-  {
-    id: "8",
-    date: "2024-12-12",
-    time: "14:00",
-    pair: "EURUSD",
-    direction: "long",
-    target: 1.75,
-    stopLoss: 0.5,
-    result: "target",
-    emotion: "Sicuro",
-    confluencesPro: ["Trend forte", "Volume alto", "Livello chiave"],
-    confluencesContro: [],
-  },
-  {
-    id: "9",
-    date: "2024-12-13",
-    time: "08:30",
-    pair: "GBPUSD",
-    direction: "short",
-    target: 2.0,
-    stopLoss: 0.6,
-    result: "non_fillato",
-    emotion: "Neutrale",
-    confluencesPro: ["Pattern chiaro", "Trend forte"],
-    confluencesContro: [],
-  },
-  {
-    id: "10",
-    date: "2024-12-13",
-    time: "11:45",
-    pair: "USDJPY",
-    direction: "long",
-    target: 1.8,
-    stopLoss: 0.5,
-    result: "parziale",
-    emotion: "Fiducioso",
-    confluencesPro: ["Livello chiave", "Volume alto"],
-    confluencesContro: ["Orario sfavorevole"],
-  },
+  { id: "1", date: "2024-12-07", time: "09:30", pair: "EURUSD", direction: "long", target: 1.75, stopLoss: 0.5, result: "target", emotion: "Fiducioso", confluencesPro: ["Trend forte", "Supporto testato"], confluencesContro: ["Notizie in arrivo"], imageUrls: [], notes: "" },
+  { id: "2", date: "2024-12-08", time: "14:15", pair: "GBPUSD", direction: "short", target: 1.5, stopLoss: 0.75, result: "stop_loss", emotion: "FOMO", confluencesPro: ["Pattern chiaro"], confluencesContro: ["Contro trend", "Bassa liquidità"], imageUrls: [], notes: "" },
+  { id: "3", date: "2024-12-09", time: "10:00", pair: "USDJPY", direction: "long", target: 2.0, stopLoss: 0.6, result: "breakeven", emotion: "Neutrale", confluencesPro: ["Volume alto", "Livello chiave"], confluencesContro: [], imageUrls: [], notes: "" },
+  { id: "4", date: "2024-12-10", time: "16:45", pair: "EURUSD", direction: "short", target: 1.25, stopLoss: 0.4, result: "target", emotion: "Sicuro", confluencesPro: ["Trend forte", "Pattern chiaro", "Volume alto"], confluencesContro: ["Orario sfavorevole"], imageUrls: [], notes: "" },
+  { id: "5", date: "2024-12-11", time: "11:20", pair: "XAUUSD", direction: "long", target: 3.0, stopLoss: 1.0, result: "target", emotion: "Fiducioso", confluencesPro: ["Trend forte", "Livello chiave"], confluencesContro: [], imageUrls: [], notes: "" },
+  { id: "6", date: "2024-12-11", time: "15:30", pair: "GBPJPY", direction: "short", target: 2.5, stopLoss: 0.8, result: "parziale", emotion: "Neutrale", confluencesPro: ["Pattern chiaro", "Volume alto"], confluencesContro: ["Orario sfavorevole"], imageUrls: [], notes: "" },
+  { id: "7", date: "2024-12-12", time: "09:00", pair: "USDCAD", direction: "long", target: 1.5, stopLoss: 0.5, result: "stop_loss", emotion: "Impaziente", confluencesPro: ["Supporto testato"], confluencesContro: ["Notizie in arrivo", "Pattern debole"], imageUrls: [], notes: "" },
+  { id: "8", date: "2024-12-12", time: "14:00", pair: "EURUSD", direction: "long", target: 1.75, stopLoss: 0.5, result: "target", emotion: "Sicuro", confluencesPro: ["Trend forte", "Volume alto", "Livello chiave"], confluencesContro: [], imageUrls: [], notes: "" },
+  { id: "9", date: "2024-12-13", time: "08:30", pair: "GBPUSD", direction: "short", target: 2.0, stopLoss: 0.6, result: "non_fillato", emotion: "Neutrale", confluencesPro: ["Pattern chiaro", "Trend forte"], confluencesContro: [], imageUrls: [], notes: "" },
+  { id: "10", date: "2024-12-13", time: "11:45", pair: "USDJPY", direction: "long", target: 1.8, stopLoss: 0.5, result: "parziale", emotion: "Fiducioso", confluencesPro: ["Livello chiave", "Volume alto"], confluencesContro: ["Orario sfavorevole"], imageUrls: [], notes: "" },
 ];
 
 const defaultPairs = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
@@ -159,6 +41,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("new-entry");
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const stats = {
     totalOperations: trades.length,
@@ -184,9 +68,16 @@ export default function Dashboard() {
       emotion: formData.emotion,
       confluencesPro: formData.confluencesPro,
       confluencesContro: formData.confluencesContro,
+      imageUrls: formData.imageUrls,
+      notes: formData.notes,
     };
     setTrades((prev) => [...prev, newTrade]);
     setActiveTab("operations");
+  };
+
+  const handleRowClick = (trade: Trade) => {
+    setSelectedTrade(trade);
+    setIsDetailModalOpen(true);
   };
 
   const handleDeleteTrade = (id: string) => {
@@ -319,7 +210,13 @@ export default function Dashboard() {
               <ConfluenceStats trades={trades} type="contro" />
             </div>
 
-            {/* Row 7: Equity Curve */}
+            {/* Row 7: Equity Projection + Risk of Ruin */}
+            <div className="grid lg:grid-cols-2 gap-6">
+              <EquityProjection trades={trades} />
+              <RiskOfRuinTable trades={trades} />
+            </div>
+
+            {/* Row 8: Equity Curve */}
             <EquityCurveChart data={equityData} />
           </div>
         )}
@@ -336,11 +233,21 @@ export default function Dashboard() {
         )}
 
         {activeTab === "operations" && (
-          <TradesTable
-            trades={trades}
-            onEdit={(trade) => console.log("Edit:", trade)}
-            onDelete={handleDeleteTrade}
-          />
+          <>
+            <TradesTable
+              trades={trades}
+              onEdit={(trade) => console.log("Edit:", trade)}
+              onDelete={handleDeleteTrade}
+              onRowClick={handleRowClick}
+            />
+            <TradeDetailModal
+              trade={selectedTrade}
+              open={isDetailModalOpen}
+              onOpenChange={setIsDetailModalOpen}
+              onEdit={(trade) => console.log("Edit:", trade)}
+              onDelete={handleDeleteTrade}
+            />
+          </>
         )}
 
         {activeTab === "new-entry" && (

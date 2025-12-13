@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -11,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Copy } from "lucide-react";
+import { Plus, X, Copy, ImageIcon, Trash2 } from "lucide-react";
 import ConfluenceTag from "./ConfluenceTag";
 
 const PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
@@ -35,6 +36,8 @@ export interface TradeFormData {
   emotion: string;
   confluencesPro: string[];
   confluencesContro: string[];
+  imageUrls: string[];
+  notes: string;
 }
 
 const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
@@ -52,10 +55,28 @@ export default function TradeForm({ onSubmit, onDuplicate }: TradeFormProps) {
     emotion: "Neutrale",
     confluencesPro: [],
     confluencesContro: [],
+    imageUrls: [],
+    notes: "",
   });
 
   const [newProTag, setNewProTag] = useState("");
   const [newControTag, setNewControTag] = useState("");
+  const [newImageUrl, setNewImageUrl] = useState("");
+
+  const addImageUrl = (url: string) => {
+    if (!url.trim()) return;
+    if (!formData.imageUrls.includes(url)) {
+      setFormData((prev) => ({ ...prev, imageUrls: [...prev.imageUrls, url] }));
+    }
+    setNewImageUrl("");
+  };
+
+  const removeImageUrl = (url: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((u) => u !== url),
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,6 +362,69 @@ export default function TradeForm({ onSubmit, onDuplicate }: TradeFormProps) {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="space-y-3">
+          <Label htmlFor="notes">Note</Label>
+          <Textarea
+            id="notes"
+            placeholder="Aggiungi note sul trade..."
+            value={formData.notes}
+            onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+            className="resize-none"
+            rows={2}
+            data-testid="input-notes"
+          />
+        </div>
+
+        <div className="space-y-3">
+          <Label>Screenshot / Immagini</Label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Incolla URL immagine..."
+              value={newImageUrl}
+              onChange={(e) => setNewImageUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addImageUrl(newImageUrl))}
+              className="flex-1"
+              data-testid="input-image-url"
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              onClick={() => addImageUrl(newImageUrl)}
+              data-testid="button-add-image"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+          {formData.imageUrls.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {formData.imageUrls.map((url, index) => (
+                <div
+                  key={index}
+                  className="relative group w-20 h-20 rounded-md overflow-hidden border border-border"
+                >
+                  <img
+                    src={url}
+                    alt={`Screenshot ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23333' width='80' height='80'/%3E%3Ctext fill='%23888' x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='10'%3EError%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImageUrl(url)}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                    data-testid={`button-remove-image-${index}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-4">

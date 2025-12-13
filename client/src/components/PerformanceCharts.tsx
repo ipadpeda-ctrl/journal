@@ -25,11 +25,11 @@ export function PerformanceByPair({ trades }: PerformanceByPairProps) {
       pairData[trade.pair] = 0;
     }
     if (trade.result === "target") {
-      pairData[trade.pair] += trade.target * 100;
+      pairData[trade.pair] += trade.target;
     } else if (trade.result === "parziale") {
-      pairData[trade.pair] += (trade.target * 0.5) * 100;
+      pairData[trade.pair] += trade.target * 0.5;
     } else if (trade.result === "stop_loss") {
-      pairData[trade.pair] -= trade.stopLoss * 100;
+      pairData[trade.pair] -= trade.stopLoss;
     }
   }
 
@@ -51,7 +51,7 @@ export function PerformanceByPair({ trades }: PerformanceByPairProps) {
                 border: "1px solid hsl(var(--border))",
                 borderRadius: "6px",
               }}
-              formatter={(value: number) => [`${value.toFixed(2)}`, "P&L"]}
+              formatter={(value: number) => [`${value >= 0 ? "+" : ""}${value.toFixed(2)}%`, "P&L"]}
             />
             <Bar
               dataKey="pnl"

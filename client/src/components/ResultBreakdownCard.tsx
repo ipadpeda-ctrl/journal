@@ -49,7 +49,7 @@ export default function ResultBreakdownCard({ title, result, trades, color }: Re
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xs font-bold">{percent}%</span>
+          <span className="text-[9px] font-medium">{percent}%</span>
         </div>
       </div>
       <div>

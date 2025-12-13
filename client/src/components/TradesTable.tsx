@@ -35,15 +35,18 @@ export interface Trade {
   emotion: string;
   confluencesPro: string[];
   confluencesContro: string[];
+  imageUrls: string[];
+  notes: string;
 }
 
 interface TradesTableProps {
   trades: Trade[];
   onEdit?: (trade: Trade) => void;
   onDelete?: (id: string) => void;
+  onRowClick?: (trade: Trade) => void;
 }
 
-export default function TradesTable({ trades, onEdit, onDelete }: TradesTableProps) {
+export default function TradesTable({ trades, onEdit, onDelete, onRowClick }: TradesTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPair, setFilterPair] = useState<string>("all");
   const [filterResult, setFilterResult] = useState<string>("all");
@@ -142,7 +145,12 @@ export default function TradesTable({ trades, onEdit, onDelete }: TradesTablePro
               </TableRow>
             ) : (
               filteredTrades.map((trade) => (
-                <TableRow key={trade.id} data-testid={`row-trade-${trade.id}`}>
+                <TableRow
+                  key={trade.id}
+                  data-testid={`row-trade-${trade.id}`}
+                  className="cursor-pointer hover-elevate"
+                  onClick={() => onRowClick?.(trade)}
+                >
                   <TableCell className="font-mono text-sm">{trade.date}</TableCell>
                   <TableCell className="font-mono text-sm">{trade.time}</TableCell>
                   <TableCell className="font-medium">{trade.pair}</TableCell>
@@ -175,7 +183,7 @@ export default function TradesTable({ trades, onEdit, onDelete }: TradesTablePro
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => onEdit?.(trade)}
+                        onClick={(e) => { e.stopPropagation(); onEdit?.(trade); }}
                         data-testid={`button-edit-trade-${trade.id}`}
                       >
                         <Pencil className="w-4 h-4" />
@@ -183,7 +191,7 @@ export default function TradesTable({ trades, onEdit, onDelete }: TradesTablePro
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => onDelete?.(trade.id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete?.(trade.id); }}
                         data-testid={`button-delete-trade-${trade.id}`}
                       >
                         <Trash2 className="w-4 h-4" />
