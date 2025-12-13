@@ -246,7 +246,7 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* Row 1: Direction Breakdown + Win Rate + Risultato Finale */}
             <div className="grid lg:grid-cols-3 gap-6">
-              <DirectionBreakdown data={directionBreakdown} />
+              <DirectionBreakdown trades={trades} />
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
@@ -276,51 +276,47 @@ export default function Dashboard() {
             {/* Row 2: Trade Count Donut + Performance by Pair */}
             <div className="grid lg:grid-cols-2 gap-6">
               <TradeCountDonut trades={trades} />
-              <PerformanceByPair data={performanceByPair} />
+              <PerformanceByPair trades={trades} />
             </div>
 
             {/* Row 3: Metrics Cards */}
-            <MetricsCards data={metricsData} />
+            <MetricsCards trades={trades} />
 
             {/* Row 4: Result Breakdown Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <ResultBreakdownCard
                 title="Take Profit"
-                total={resultBreakdownData.target.total}
-                long={resultBreakdownData.target.long}
-                short={resultBreakdownData.target.short}
-                color="emerald"
+                result="target"
+                trades={trades}
+                color="hsl(142, 71%, 45%)"
               />
               <ResultBreakdownCard
                 title="Stop Loss"
-                total={resultBreakdownData.stopLoss.total}
-                long={resultBreakdownData.stopLoss.long}
-                short={resultBreakdownData.stopLoss.short}
-                color="red"
+                result="stop_loss"
+                trades={trades}
+                color="hsl(0, 84%, 60%)"
               />
               <ResultBreakdownCard
                 title="Breakeven"
-                total={resultBreakdownData.breakeven.total}
-                long={resultBreakdownData.breakeven.long}
-                short={resultBreakdownData.breakeven.short}
-                color="yellow"
+                result="breakeven"
+                trades={trades}
+                color="hsl(45, 93%, 47%)"
               />
               <ResultBreakdownCard
                 title="Parziali"
-                total={resultBreakdownData.parziale.total}
-                long={resultBreakdownData.parziale.long}
-                short={resultBreakdownData.parziale.short}
-                color="blue"
+                result="parziale"
+                trades={trades}
+                color="hsl(217, 91%, 60%)"
               />
             </div>
 
             {/* Row 5: Mood Tracker */}
-            <MoodTracker data={moodData} />
+            <MoodTracker trades={trades} />
 
             {/* Row 6: Confluence Stats */}
             <div className="grid lg:grid-cols-2 gap-6">
-              <ConfluenceStats title="Confluenze PRO" data={confluencesPro} />
-              <ConfluenceStats title="Confluenze CONTRO" data={confluencesContro} />
+              <ConfluenceStats trades={trades} type="pro" />
+              <ConfluenceStats trades={trades} type="contro" />
             </div>
 
             {/* Row 7: Equity Curve */}
@@ -331,14 +327,10 @@ export default function Dashboard() {
         {activeTab === "calendario" && (
           <div className="flex gap-6">
             <div className="flex-1">
-              <Calendar
-                trades={trades}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-              />
+              <Calendar trades={trades} />
             </div>
             <div className="w-80 flex-shrink-0">
-              <WeeklyRecap trades={trades} selectedDate={selectedDate} />
+              <WeeklyRecap trades={trades} currentDate={selectedDate} />
             </div>
           </div>
         )}
