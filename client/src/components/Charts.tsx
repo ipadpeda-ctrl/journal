@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   BarChart,
   Bar,
@@ -13,7 +17,10 @@ import {
   LineChart,
   Line,
   Legend,
+  Brush,
+  ReferenceArea,
 } from "recharts";
+import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 interface ChartCardProps {
   title: string;
@@ -158,35 +165,172 @@ export function WinRateChart({ data }: { data: WinRateData }) {
 interface EquityPoint {
   date: string;
   equity: number;
+  fullDate?: string;
 }
 
-export function EquityCurveChart({ data }: { data: EquityPoint[] }) {
+interface EquityCurveChartProps {
+  data: EquityPoint[];
+  startDate?: string;
+  endDate?: string;
+  onDateRangeChange?: (start: string, end: string) => void;
+}
+
+export function EquityCurveChart({ data, startDate, endDate, onDateRangeChange }: EquityCurveChartProps) {
+  const [localStartDate, setLocalStartDate] = useState(startDate || "");
+  const [localEndDate, setLocalEndDate] = useState(endDate || "");
+  const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
+  const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
+  const [zoomedData, setZoomedData] = useState<EquityPoint[] | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+
+  const displayData = zoomedData || data;
+
+  const handleMouseDown = (e: any) => {
+    if (e && e.activeLabel) {
+      setRefAreaLeft(e.activeLabel);
+      setIsSelecting(true);
+    }
+  };
+
+  const handleMouseMove = (e: any) => {
+    if (isSelecting && e && e.activeLabel) {
+      setRefAreaRight(e.activeLabel);
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (refAreaLeft && refAreaRight) {
+      const leftIndex = data.findIndex((d) => d.date === refAreaLeft);
+      const rightIndex = data.findIndex((d) => d.date === refAreaRight);
+      
+      if (leftIndex !== -1 && rightIndex !== -1) {
+        const startIdx = Math.min(leftIndex, rightIndex);
+        const endIdx = Math.max(leftIndex, rightIndex);
+        
+        if (endIdx - startIdx >= 1) {
+          setZoomedData(data.slice(startIdx, endIdx + 1));
+        }
+      }
+    }
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+    setIsSelecting(false);
+  };
+
+  const handleResetZoom = () => {
+    setZoomedData(null);
+  };
+
+  const handleApplyFilter = () => {
+    if (onDateRangeChange && localStartDate && localEndDate) {
+      onDateRangeChange(localStartDate, localEndDate);
+    }
+  };
+
+  const handleResetFilter = () => {
+    setLocalStartDate("");
+    setLocalEndDate("");
+    setZoomedData(null);
+    if (onDateRangeChange) {
+      onDateRangeChange("", "");
+    }
+  };
+
   return (
-    <ChartCard title="Equity Curve" className="lg:col-span-2">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "6px",
-            }}
-            formatter={(value: number) => [`${value.toFixed(2)}`, "Equity"]}
-          />
-          <Line
-            type="monotone"
-            dataKey="equity"
-            stroke="hsl(var(--chart-1))"
-            strokeWidth={2}
-            dot={{ fill: "hsl(var(--chart-1))", strokeWidth: 0, r: 3 }}
-            activeDot={{ r: 5, fill: "hsl(var(--chart-1))" }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </ChartCard>
+    <Card className="p-4 lg:col-span-2">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <h3 className="text-sm font-medium">Equity Curve</h3>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="startDate" className="text-xs text-muted-foreground">Da:</Label>
+            <Input
+              id="startDate"
+              type="date"
+              value={localStartDate}
+              onChange={(e) => setLocalStartDate(e.target.value)}
+              className="h-8 w-32 text-xs"
+              data-testid="input-chart-start-date"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="endDate" className="text-xs text-muted-foreground">A:</Label>
+            <Input
+              id="endDate"
+              type="date"
+              value={localEndDate}
+              onChange={(e) => setLocalEndDate(e.target.value)}
+              className="h-8 w-32 text-xs"
+              data-testid="input-chart-end-date"
+            />
+          </div>
+          
+          {zoomedData && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetZoom}
+              className="h-8"
+              data-testid="button-reset-zoom"
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Reset Zoom
+            </Button>
+          )}
+        </div>
+      </div>
+      
+      <p className="text-xs text-muted-foreground mb-2">
+        Trascina sul grafico per zoomare in un'area specifica
+      </p>
+      
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={displayData}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} domain={['auto', 'auto']} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: "6px",
+              }}
+              formatter={(value: number) => [`${value.toFixed(2)} EUR`, "Equity"]}
+            />
+            <Line
+              type="monotone"
+              dataKey="equity"
+              stroke="hsl(var(--chart-1))"
+              strokeWidth={2}
+              dot={{ fill: "hsl(var(--chart-1))", strokeWidth: 0, r: 3 }}
+              activeDot={{ r: 5, fill: "hsl(var(--chart-1))" }}
+            />
+            {refAreaLeft && refAreaRight && (
+              <ReferenceArea
+                x1={refAreaLeft}
+                x2={refAreaRight}
+                strokeOpacity={0.3}
+                fill="hsl(var(--primary))"
+                fillOpacity={0.2}
+              />
+            )}
+            <Brush
+              dataKey="date"
+              height={25}
+              stroke="hsl(var(--primary))"
+              fill="hsl(var(--muted))"
+              tickFormatter={(val) => val}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   );
 }
 

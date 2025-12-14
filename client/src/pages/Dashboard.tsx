@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header, { Tab } from "@/components/Header";
@@ -22,7 +22,10 @@ import RiskOfRuinTable from "@/components/RiskOfRuinTable";
 import AdvancedMetrics from "@/components/AdvancedMetrics";
 import MonthlyComparison from "@/components/MonthlyComparison";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download, Filter, X, Calendar as CalendarIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { Trade as SchemaTrade } from "@shared/schema";
 
 const defaultPairs = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
@@ -40,6 +43,7 @@ function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
     target: t.target || 0,
     stopLoss: t.stopLoss || 0,
     result: t.result as Trade["result"],
+    pnl: t.pnl || 0,
     emotion: t.emotion || "",
     confluencesPro: t.confluencesPro || [],
     confluencesContro: t.confluencesContro || [],
@@ -48,18 +52,72 @@ function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
   };
 }
 
+function exportTradesToCSV(trades: Trade[]) {
+  const headers = ["Data", "Ora", "Coppia", "Direzione", "Target", "Stop Loss", "Risultato", "P&L", "Emozione", "Confluenze Pro", "Confluenze Contro", "Note"];
+  const rows = trades.map(t => [
+    t.date,
+    t.time,
+    t.pair,
+    t.direction === "long" ? "Long" : "Short",
+    t.target.toFixed(5),
+    t.stopLoss.toFixed(5),
+    t.result,
+    (t.pnl || 0).toFixed(2),
+    t.emotion,
+    t.confluencesPro.join("; "),
+    t.confluencesContro.join("; "),
+    t.notes.replace(/"/g, '""'),
+  ]);
+  
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+  ].join("\n");
+  
+  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `trades_export_${new Date().toISOString().split("T")[0]}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("new-entry");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
 
   const { data: schemaTrades = [], isLoading } = useQuery<SchemaTrade[]>({
     queryKey: ["/api/trades"],
   });
 
   const trades: Trade[] = schemaTrades.map(mapSchemaTradeToTrade);
+
+  const filteredTrades = useMemo(() => {
+    if (!filterStartDate && !filterEndDate) {
+      return trades;
+    }
+    return trades.filter((trade) => {
+      const tradeDate = trade.date;
+      if (filterStartDate && tradeDate < filterStartDate) return false;
+      if (filterEndDate && tradeDate > filterEndDate) return false;
+      return true;
+    });
+  }, [trades, filterStartDate, filterEndDate]);
+
+  const isFiltered = filterStartDate || filterEndDate;
+
+  const clearFilters = () => {
+    setFilterStartDate("");
+    setFilterEndDate("");
+  };
 
   const createTradeMutation = useMutation({
     mutationFn: async (data: TradeFormData) => {
@@ -114,16 +172,16 @@ export default function Dashboard() {
     },
   });
 
-  const stats = {
-    totalOperations: trades.length,
-    winRate: trades.length > 0
-      ? ((trades.filter((t) => t.result === "target").length / trades.length) * 100).toFixed(1)
+  const stats = useMemo(() => ({
+    totalOperations: filteredTrades.length,
+    winRate: filteredTrades.length > 0
+      ? ((filteredTrades.filter((t) => t.result === "target").length / filteredTrades.length) * 100).toFixed(1)
       : "0",
-    profitFactor: calculateProfitFactor(trades),
-    totalEquity: calculateEquity(trades),
-  };
+    profitFactor: calculateProfitFactor(filteredTrades),
+    totalEquity: calculateEquity(filteredTrades),
+  }), [filteredTrades]);
 
-  const equityData = calculateEquityCurve(trades);
+  const equityData = useMemo(() => calculateEquityCurve(filteredTrades), [filteredTrades]);
 
   const handleSubmitTrade = (formData: TradeFormData) => {
     if (editingTrade) {
@@ -168,48 +226,48 @@ export default function Dashboard() {
   };
 
   // Calculate result breakdown data
-  const resultBreakdownData = {
+  const resultBreakdownData = useMemo(() => ({
     target: {
-      total: trades.filter((t) => t.result === "target").length,
-      long: trades.filter((t) => t.result === "target" && t.direction === "long").length,
-      short: trades.filter((t) => t.result === "target" && t.direction === "short").length,
+      total: filteredTrades.filter((t) => t.result === "target").length,
+      long: filteredTrades.filter((t) => t.result === "target" && t.direction === "long").length,
+      short: filteredTrades.filter((t) => t.result === "target" && t.direction === "short").length,
     },
     stopLoss: {
-      total: trades.filter((t) => t.result === "stop_loss").length,
-      long: trades.filter((t) => t.result === "stop_loss" && t.direction === "long").length,
-      short: trades.filter((t) => t.result === "stop_loss" && t.direction === "short").length,
+      total: filteredTrades.filter((t) => t.result === "stop_loss").length,
+      long: filteredTrades.filter((t) => t.result === "stop_loss" && t.direction === "long").length,
+      short: filteredTrades.filter((t) => t.result === "stop_loss" && t.direction === "short").length,
     },
     breakeven: {
-      total: trades.filter((t) => t.result === "breakeven").length,
-      long: trades.filter((t) => t.result === "breakeven" && t.direction === "long").length,
-      short: trades.filter((t) => t.result === "breakeven" && t.direction === "short").length,
+      total: filteredTrades.filter((t) => t.result === "breakeven").length,
+      long: filteredTrades.filter((t) => t.result === "breakeven" && t.direction === "long").length,
+      short: filteredTrades.filter((t) => t.result === "breakeven" && t.direction === "short").length,
     },
     parziale: {
-      total: trades.filter((t) => t.result === "parziale").length,
-      long: trades.filter((t) => t.result === "parziale" && t.direction === "long").length,
-      short: trades.filter((t) => t.result === "parziale" && t.direction === "short").length,
+      total: filteredTrades.filter((t) => t.result === "parziale").length,
+      long: filteredTrades.filter((t) => t.result === "parziale" && t.direction === "long").length,
+      short: filteredTrades.filter((t) => t.result === "parziale" && t.direction === "short").length,
     },
-  };
+  }), [filteredTrades]);
 
   // Calculate metrics
-  const metricsData = calculateMetrics(trades);
+  const metricsData = useMemo(() => calculateMetrics(filteredTrades), [filteredTrades]);
 
   // Calculate mood data
-  const moodData = calculateMoodData(trades);
+  const moodData = useMemo(() => calculateMoodData(filteredTrades), [filteredTrades]);
 
   // Calculate confluence stats
-  const { confluencesPro, confluencesContro } = calculateConfluenceStats(trades);
+  const { confluencesPro, confluencesContro } = useMemo(() => calculateConfluenceStats(filteredTrades), [filteredTrades]);
 
   // Calculate performance by pair
-  const performanceByPair = calculatePerformanceByPair(trades);
+  const performanceByPair = useMemo(() => calculatePerformanceByPair(filteredTrades), [filteredTrades]);
 
   // Calculate direction breakdown
-  const directionBreakdown = {
-    longWins: trades.filter((t) => t.direction === "long" && t.result === "target").length,
-    longLosses: trades.filter((t) => t.direction === "long" && t.result === "stop_loss").length,
-    shortWins: trades.filter((t) => t.direction === "short" && t.result === "target").length,
-    shortLosses: trades.filter((t) => t.direction === "short" && t.result === "stop_loss").length,
-  };
+  const directionBreakdown = useMemo(() => ({
+    longWins: filteredTrades.filter((t) => t.direction === "long" && t.result === "target").length,
+    longLosses: filteredTrades.filter((t) => t.direction === "long" && t.result === "stop_loss").length,
+    shortWins: filteredTrades.filter((t) => t.direction === "short" && t.result === "target").length,
+    shortLosses: filteredTrades.filter((t) => t.direction === "short" && t.result === "stop_loss").length,
+  }), [filteredTrades]);
 
   if (isLoading) {
     return (
@@ -231,9 +289,71 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === "statistiche" && (
           <div className="space-y-6">
+            {/* Filter Bar */}
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Filtra per periodo:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="filterStart" className="text-xs text-muted-foreground">Da:</Label>
+                    <Input
+                      id="filterStart"
+                      type="date"
+                      value={filterStartDate}
+                      onChange={(e) => setFilterStartDate(e.target.value)}
+                      className="h-8 w-36 text-xs"
+                      data-testid="input-filter-start-date"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="filterEnd" className="text-xs text-muted-foreground">A:</Label>
+                    <Input
+                      id="filterEnd"
+                      type="date"
+                      value={filterEndDate}
+                      onChange={(e) => setFilterEndDate(e.target.value)}
+                      className="h-8 w-36 text-xs"
+                      data-testid="input-filter-end-date"
+                    />
+                  </div>
+                  {isFiltered && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="h-8"
+                      data-testid="button-clear-filters"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Rimuovi filtri
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {isFiltered && (
+                    <span className="text-xs text-muted-foreground">
+                      Mostrati {filteredTrades.length} di {trades.length} trade
+                    </span>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={() => exportTradesToCSV(filteredTrades)}
+                    disabled={filteredTrades.length === 0}
+                    data-testid="button-export-csv"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Esporta CSV
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
             {/* Row 1: Direction Breakdown + Win Rate + Risultato Finale */}
             <div className="grid lg:grid-cols-3 gap-6">
-              <DirectionBreakdown trades={trades} />
+              <DirectionBreakdown trades={filteredTrades} />
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
@@ -241,7 +361,7 @@ export default function Dashboard() {
                 <CardContent>
                   <div className="text-3xl font-bold" data-testid="text-winrate-value">{stats.winRate}%</div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {trades.filter((t) => t.result === "target").length} vincenti su {trades.length} totali
+                    {filteredTrades.filter((t) => t.result === "target").length} vincenti su {filteredTrades.length} totali
                   </p>
                 </CardContent>
               </Card>
@@ -262,60 +382,60 @@ export default function Dashboard() {
 
             {/* Row 2: Trade Count Donut + Performance by Pair */}
             <div className="grid lg:grid-cols-2 gap-6">
-              <TradeCountDonut trades={trades} />
-              <PerformanceByPair trades={trades} />
+              <TradeCountDonut trades={filteredTrades} />
+              <PerformanceByPair trades={filteredTrades} />
             </div>
 
             {/* Row 3: Metrics Cards */}
-            <MetricsCards trades={trades} />
+            <MetricsCards trades={filteredTrades} />
 
             {/* Row 3.5: Advanced Metrics - Drawdown, Streaks, Performance by Day/Hour */}
-            <AdvancedMetrics trades={trades} />
+            <AdvancedMetrics trades={filteredTrades} />
 
             {/* Row 3.6: Monthly Comparison */}
-            <MonthlyComparison trades={trades} />
+            <MonthlyComparison trades={filteredTrades} />
 
             {/* Row 4: Result Breakdown Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <ResultBreakdownCard
                 title="Take Profit"
                 result="target"
-                trades={trades}
+                trades={filteredTrades}
                 color="hsl(142, 71%, 45%)"
               />
               <ResultBreakdownCard
                 title="Stop Loss"
                 result="stop_loss"
-                trades={trades}
+                trades={filteredTrades}
                 color="hsl(0, 84%, 60%)"
               />
               <ResultBreakdownCard
                 title="Breakeven"
                 result="breakeven"
-                trades={trades}
+                trades={filteredTrades}
                 color="hsl(45, 93%, 47%)"
               />
               <ResultBreakdownCard
                 title="Parziali"
                 result="parziale"
-                trades={trades}
+                trades={filteredTrades}
                 color="hsl(217, 91%, 60%)"
               />
             </div>
 
             {/* Row 5: Mood Tracker */}
-            <MoodTracker trades={trades} />
+            <MoodTracker trades={filteredTrades} />
 
             {/* Row 6: Confluence Stats */}
             <div className="grid lg:grid-cols-2 gap-6">
-              <ConfluenceStats trades={trades} type="pro" />
-              <ConfluenceStats trades={trades} type="contro" />
+              <ConfluenceStats trades={filteredTrades} type="pro" />
+              <ConfluenceStats trades={filteredTrades} type="contro" />
             </div>
 
             {/* Row 7: Equity Projection + Risk of Ruin */}
             <div className="grid lg:grid-cols-2 gap-6">
-              <EquityProjection trades={trades} />
-              <RiskOfRuinTable trades={trades} />
+              <EquityProjection trades={filteredTrades} />
+              <RiskOfRuinTable trades={filteredTrades} />
             </div>
 
             {/* Row 8: Equity Curve */}
