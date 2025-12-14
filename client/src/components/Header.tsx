@@ -11,7 +11,7 @@ import { Moon, Sun, TrendingUp, LogOut, Shield, User as UserIcon } from "lucide-
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
 
-type Tab = "new-entry" | "operations" | "calendario" | "statistiche" | "settings" | "admin";
+type Tab = "new-entry" | "operations" | "calendario" | "statistiche" | "diary" | "goals" | "settings" | "admin";
 
 interface HeaderProps {
   activeTab: Tab;
@@ -27,6 +27,8 @@ export default function Header({ activeTab, onTabChange }: HeaderProps) {
     { id: "operations", label: "Operazioni" },
     { id: "calendario", label: "Calendario" },
     { id: "statistiche", label: "Statistiche" },
+    { id: "diary", label: "Diario" },
+    { id: "goals", label: "Obiettivi" },
     { id: "settings", label: "Impostazioni" },
     ...(isAdmin ? [{ id: "admin" as Tab, label: "Admin", adminOnly: true }] : []),
   ];

@@ -21,6 +21,8 @@ import EquityProjection from "@/components/EquityProjection";
 import RiskOfRuinTable from "@/components/RiskOfRuinTable";
 import AdvancedMetrics from "@/components/AdvancedMetrics";
 import MonthlyComparison from "@/components/MonthlyComparison";
+import TradingDiary from "@/components/TradingDiary";
+import MonthlyGoals from "@/components/MonthlyGoals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Download, Filter, X, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -502,6 +504,19 @@ export default function Dashboard() {
             confluencesPro={defaultConfluencesPro}
             confluencesContro={defaultConfluencesContro}
             onSave={(settings) => console.log("Settings saved:", settings)}
+          />
+        )}
+
+        {activeTab === "diary" && <TradingDiary />}
+
+        {activeTab === "goals" && (
+          <MonthlyGoals
+            trades={trades.map((t) => ({
+              date: t.date,
+              result: t.result,
+              target: t.target,
+              stopLoss: t.stopLoss,
+            }))}
           />
         )}
       </main>
