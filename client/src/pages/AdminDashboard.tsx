@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
 import type { User, Trade } from "@shared/schema";
 
 interface AdminTrade extends Trade {
@@ -92,7 +93,37 @@ export default function AdminDashboard() {
     const wins = userTrades.filter((t) => t.result === "target").length;
     const losses = userTrades.filter((t) => t.result === "stop_loss").length;
     const winRate = userTrades.length > 0 ? (wins / userTrades.length) * 100 : 0;
-    return { totalTrades: userTrades.length, wins, losses, winRate };
+    const pnl = userTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    return { totalTrades: userTrades.length, wins, losses, winRate, pnl };
+  };
+
+  const leaderboardByWinRate = users
+    .map((u) => ({ ...u, stats: getUserStats(u.id) }))
+    .filter((u) => u.stats.totalTrades >= 1)
+    .sort((a, b) => b.stats.winRate - a.stats.winRate)
+    .slice(0, 10);
+
+  const leaderboardByPnL = users
+    .map((u) => ({ ...u, stats: getUserStats(u.id) }))
+    .filter((u) => u.stats.totalTrades >= 1)
+    .sort((a, b) => b.stats.pnl - a.stats.pnl)
+    .slice(0, 10);
+
+  const userTradesChartData = users
+    .map((u) => ({
+      name: u.firstName || u.email?.split("@")[0] || "?",
+      trades: getUserStats(u.id).totalTrades,
+      winRate: getUserStats(u.id).winRate,
+    }))
+    .filter((u) => u.trades > 0)
+    .sort((a, b) => b.trades - a.trades)
+    .slice(0, 8);
+
+  const getMedalIcon = (index: number) => {
+    if (index === 0) return <Trophy className="w-5 h-5 text-yellow-500" />;
+    if (index === 1) return <Medal className="w-5 h-5 text-gray-400" />;
+    if (index === 2) return <Award className="w-5 h-5 text-amber-600" />;
+    return <span className="w-5 text-center text-muted-foreground font-mono">{index + 1}</span>;
   };
 
   const totalStats = {
@@ -208,6 +239,7 @@ export default function AdminDashboard() {
           <TabsList>
             <TabsTrigger value="users" data-testid="tab-users">Utenti</TabsTrigger>
             <TabsTrigger value="trades" data-testid="tab-trades">Tutte le Operazioni</TabsTrigger>
+            <TabsTrigger value="leaderboard" data-testid="tab-leaderboard">Classifica</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -343,6 +375,126 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="leaderboard">
+            <div className="grid lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-500" />
+                    Top Win Rate
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {leaderboardByWinRate.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">Nessun dato disponibile</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {leaderboardByWinRate.map((u, idx) => (
+                        <div
+                          key={u.id}
+                          className="flex items-center gap-3 p-2 rounded-md hover-elevate"
+                          data-testid={`leaderboard-winrate-${idx}`}
+                        >
+                          <div className="flex items-center justify-center w-6">{getMedalIcon(idx)}</div>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={u.profileImageUrl || undefined} />
+                            <AvatarFallback>{u.firstName?.[0] || u.email?.[0] || "?"}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{u.firstName || u.email?.split("@")[0]}</p>
+                            <p className="text-xs text-muted-foreground">{u.stats.totalTrades} trades</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-emerald-500">{u.stats.winRate.toFixed(1)}%</p>
+                            <p className="text-xs text-muted-foreground">{u.stats.wins}W / {u.stats.losses}L</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-emerald-500" />
+                    Top P&L
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {leaderboardByPnL.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">Nessun dato disponibile</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {leaderboardByPnL.map((u, idx) => (
+                        <div
+                          key={u.id}
+                          className="flex items-center gap-3 p-2 rounded-md hover-elevate"
+                          data-testid={`leaderboard-pnl-${idx}`}
+                        >
+                          <div className="flex items-center justify-center w-6">{getMedalIcon(idx)}</div>
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={u.profileImageUrl || undefined} />
+                            <AvatarFallback>{u.firstName?.[0] || u.email?.[0] || "?"}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{u.firstName || u.email?.split("@")[0]}</p>
+                            <p className="text-xs text-muted-foreground">{u.stats.totalTrades} trades</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-bold font-mono ${u.stats.pnl >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                              {u.stats.pnl >= 0 ? "+" : ""}{u.stats.pnl.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{u.stats.winRate.toFixed(1)}% WR</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5" />
+                    Attivita per Utente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {userTradesChartData.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Nessun dato disponibile</p>
+                  ) : (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={userTradesChartData} layout="vertical">
+                          <XAxis type="number" />
+                          <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                          <Tooltip
+                            formatter={(value: number, name: string) => {
+                              if (name === "trades") return [value, "Trades"];
+                              return [value.toFixed(1) + "%", "Win Rate"];
+                            }}
+                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                          />
+                          <Bar dataKey="trades" name="trades" radius={[0, 4, 4, 0]}>
+                            {userTradesChartData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={entry.winRate >= 50 ? "hsl(var(--chart-2))" : "hsl(var(--chart-1))"}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>

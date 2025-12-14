@@ -19,6 +19,8 @@ import MetricsCards from "@/components/MetricsCards";
 import { PerformanceByPair, TradeCountDonut, DirectionBreakdown } from "@/components/PerformanceCharts";
 import EquityProjection from "@/components/EquityProjection";
 import RiskOfRuinTable from "@/components/RiskOfRuinTable";
+import AdvancedMetrics from "@/components/AdvancedMetrics";
+import MonthlyComparison from "@/components/MonthlyComparison";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import type { Trade as SchemaTrade } from "@shared/schema";
@@ -266,6 +268,12 @@ export default function Dashboard() {
 
             {/* Row 3: Metrics Cards */}
             <MetricsCards trades={trades} />
+
+            {/* Row 3.5: Advanced Metrics - Drawdown, Streaks, Performance by Day/Hour */}
+            <AdvancedMetrics trades={trades} />
+
+            {/* Row 3.6: Monthly Comparison */}
+            <MonthlyComparison trades={trades} />
 
             {/* Row 4: Result Breakdown Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

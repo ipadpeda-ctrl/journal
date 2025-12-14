@@ -32,6 +32,7 @@ export interface Trade {
   target: number;
   stopLoss: number;
   result: TradeResult;
+  pnl?: number;
   emotion: string;
   confluencesPro: string[];
   confluencesContro: string[];
