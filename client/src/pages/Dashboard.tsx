@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import Header, { Tab } from "@/components/Header";
 import StatCard from "@/components/StatCard";
 import TradeForm, { TradeFormData } from "@/components/TradeForm";
@@ -88,6 +89,9 @@ function exportTradesToCSV(trades: Trade[]) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const initialCapital = user?.initialCapital ?? 10000;
+  
   const [activeTab, setActiveTab] = useState<Tab>("new-entry");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
@@ -180,10 +184,10 @@ export default function Dashboard() {
       ? ((filteredTrades.filter((t) => t.result === "target").length / filteredTrades.length) * 100).toFixed(1)
       : "0",
     profitFactor: calculateProfitFactor(filteredTrades),
-    totalEquity: calculateEquity(filteredTrades),
-  }), [filteredTrades]);
+    totalEquity: calculateEquity(filteredTrades, initialCapital),
+  }), [filteredTrades, initialCapital]);
 
-  const equityData = useMemo(() => calculateEquityCurve(filteredTrades), [filteredTrades]);
+  const equityData = useMemo(() => calculateEquityCurve(filteredTrades, initialCapital), [filteredTrades, initialCapital]);
 
   const handleSubmitTrade = (formData: TradeFormData) => {
     if (editingTrade) {
@@ -372,8 +376,8 @@ export default function Dashboard() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Risultato Finale</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-3xl font-bold ${parseFloat(stats.totalEquity) >= 1000 ? "text-emerald-500" : "text-red-500"}`} data-testid="text-equity-value">
-                    {parseFloat(stats.totalEquity) >= 1000 ? "+" : ""}{(parseFloat(stats.totalEquity) - 1000).toFixed(2)} EUR
+                  <div className={`text-3xl font-bold ${parseFloat(stats.totalEquity) >= initialCapital ? "text-emerald-500" : "text-red-500"}`} data-testid="text-equity-value">
+                    {parseFloat(stats.totalEquity) >= initialCapital ? "+" : ""}{(parseFloat(stats.totalEquity) - initialCapital).toFixed(2)} EUR
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
                     Equity totale: {stats.totalEquity} EUR
@@ -395,7 +399,7 @@ export default function Dashboard() {
             <AdvancedMetrics trades={filteredTrades} />
 
             {/* Row 3.6: Monthly Comparison */}
-            <MonthlyComparison trades={filteredTrades} />
+            <MonthlyComparison trades={filteredTrades} initialCapital={initialCapital} />
 
             {/* Row 4: Result Breakdown Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -436,7 +440,7 @@ export default function Dashboard() {
 
             {/* Row 7: Equity Projection + Risk of Ruin */}
             <div className="grid lg:grid-cols-2 gap-6">
-              <EquityProjection trades={filteredTrades} />
+              <EquityProjection trades={filteredTrades} initialCapital={initialCapital} />
               <RiskOfRuinTable trades={filteredTrades} />
             </div>
 
@@ -503,6 +507,7 @@ export default function Dashboard() {
             emotions={defaultEmotions}
             confluencesPro={defaultConfluencesPro}
             confluencesContro={defaultConfluencesContro}
+            initialCapital={initialCapital}
             onSave={(settings) => console.log("Settings saved:", settings)}
           />
         )}
@@ -535,8 +540,8 @@ function calculateProfitFactor(trades: Trade[]): string {
   return (totalWins / totalLosses).toFixed(2);
 }
 
-function calculateEquity(trades: Trade[]): string {
-  let equity = 1000;
+function calculateEquity(trades: Trade[], initialCapital: number = 10000): string {
+  let equity = initialCapital;
   for (const trade of trades) {
     if (trade.result === "target") {
       equity += trade.target * 100;
@@ -549,14 +554,14 @@ function calculateEquity(trades: Trade[]): string {
   return equity.toFixed(2);
 }
 
-function calculateEquityCurve(trades: Trade[]): { date: string; equity: number }[] {
+function calculateEquityCurve(trades: Trade[], initialCapital: number = 10000): { date: string; equity: number }[] {
   const sortedTrades = [...trades].sort((a, b) => {
     const dateA = new Date(`${a.date}T${a.time}`);
     const dateB = new Date(`${b.date}T${b.time}`);
     return dateA.getTime() - dateB.getTime();
   });
 
-  let equity = 1000;
+  let equity = initialCapital;
   const curve = [{ date: "Start", equity }];
 
   for (const trade of sortedTrades) {

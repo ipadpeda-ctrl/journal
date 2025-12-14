@@ -1,16 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Save } from "lucide-react";
+import { Plus, X, Save, Wallet, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface SettingsProps {
   pairs: string[];
   emotions: string[];
   confluencesPro: string[];
   confluencesContro: string[];
+  initialCapital?: number;
   onSave?: (settings: SettingsData) => void;
 }
 
@@ -26,17 +30,38 @@ export default function Settings({
   emotions: initialEmotions,
   confluencesPro: initialConfluencesPro,
   confluencesContro: initialConfluencesContro,
+  initialCapital = 10000,
   onSave,
 }: SettingsProps) {
+  const { toast } = useToast();
   const [pairs, setPairs] = useState(initialPairs);
   const [emotions, setEmotions] = useState(initialEmotions);
   const [confluencesPro, setConfluencesPro] = useState(initialConfluencesPro);
   const [confluencesContro, setConfluencesContro] = useState(initialConfluencesContro);
+  const [capital, setCapital] = useState(initialCapital);
+
+  useEffect(() => {
+    setCapital(initialCapital);
+  }, [initialCapital]);
 
   const [newPair, setNewPair] = useState("");
   const [newEmotion, setNewEmotion] = useState("");
   const [newProConfluence, setNewProConfluence] = useState("");
   const [newControConfluence, setNewControConfluence] = useState("");
+
+  const updateCapitalMutation = useMutation({
+    mutationFn: async (newCapital: number) => {
+      const res = await apiRequest("PATCH", "/api/auth/user/capital", { initialCapital: newCapital });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Capitale iniziale salvato" });
+    },
+    onError: () => {
+      toast({ title: "Errore nel salvare il capitale", variant: "destructive" });
+    },
+  });
 
   const addItem = (
     setter: React.Dispatch<React.SetStateAction<string[]>>,
@@ -63,6 +88,42 @@ export default function Settings({
 
   return (
     <div className="space-y-6">
+      <Card className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Wallet className="w-5 h-5 text-muted-foreground" />
+          <h2 className="text-lg font-medium">Capitale Iniziale</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Inserisci il tuo capitale iniziale. Questo valore sarà usato per calcolare statistiche, proiezioni e grafici.
+        </p>
+        <div className="flex gap-2 items-end">
+          <div className="flex-1 max-w-xs">
+            <Label htmlFor="initial-capital">Capitale (EUR)</Label>
+            <Input
+              id="initial-capital"
+              type="number"
+              min={0}
+              step={100}
+              value={capital}
+              onChange={(e) => setCapital(parseFloat(e.target.value) || 0)}
+              data-testid="input-initial-capital"
+            />
+          </div>
+          <Button
+            onClick={() => updateCapitalMutation.mutate(capital)}
+            disabled={updateCapitalMutation.isPending}
+            data-testid="button-save-capital"
+          >
+            {updateCapitalMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Salva
+          </Button>
+        </div>
+      </Card>
+
       <Card className="p-6">
         <h2 className="text-lg font-medium mb-4">Coppie di Trading</h2>
         <div className="flex flex-wrap gap-2 mb-4">

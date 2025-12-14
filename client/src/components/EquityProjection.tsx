@@ -20,13 +20,29 @@ export default function EquityProjection({ trades, initialCapital = 10000 }: Equ
   const lossTrades = trades.filter((t) => t.result === "stop_loss");
   const totalTrades = winTrades.length + lossTrades.length;
 
-  const winRate = totalTrades > 0 ? winTrades.length / totalTrades : 0.5;
+  if (totalTrades < 3) {
+    return (
+      <Card className="p-4" data-testid="equity-projection">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-medium">Proiezione Equity (12 mesi)</h3>
+        </div>
+        <div className="h-64 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground text-center">
+            Inserisci almeno 3 trade per vedere la proiezione.<br />
+            <span className="text-xs">Trade attuali: {totalTrades}</span>
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
+  const winRate = winTrades.length / totalTrades;
   const avgWin = winTrades.length > 0
     ? winTrades.reduce((sum, t) => sum + (t.result === "parziale" ? t.target * 0.5 : t.target), 0) / winTrades.length
-    : 2;
+    : 0;
   const avgLoss = lossTrades.length > 0
     ? lossTrades.reduce((sum, t) => sum + t.stopLoss, 0) / lossTrades.length
-    : 1;
+    : 0;
 
   const expectedReturn = (winRate * avgWin) - ((1 - winRate) * avgLoss);
 

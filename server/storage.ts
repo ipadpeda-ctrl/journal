@@ -21,6 +21,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
+  updateUserCapital(id: string, initialCapital: number): Promise<User | undefined>;
   isFirstUser(): Promise<boolean>;
 
   // Trade operations
@@ -81,6 +82,15 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserCapital(id: string, initialCapital: number): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ initialCapital, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;

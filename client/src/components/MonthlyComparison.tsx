@@ -5,6 +5,7 @@ import { TrendingUp, Calendar } from "lucide-react";
 
 interface MonthlyComparisonProps {
   trades: Trade[];
+  initialCapital?: number;
 }
 
 interface MonthlyData {
@@ -18,7 +19,18 @@ interface MonthlyData {
   equity: number;
 }
 
-function calculateMonthlyData(trades: Trade[]): MonthlyData[] {
+function calculateTradePnl(trade: Trade): number {
+  if (trade.result === "target") {
+    return trade.target * 100;
+  } else if (trade.result === "stop_loss") {
+    return -trade.stopLoss * 100;
+  } else if (trade.result === "parziale") {
+    return (trade.target * 0.5) * 100;
+  }
+  return 0;
+}
+
+function calculateMonthlyData(trades: Trade[], initialCapital: number = 10000): MonthlyData[] {
   const monthlyMap = new Map<string, Trade[]>();
 
   for (const trade of trades) {
@@ -33,7 +45,7 @@ function calculateMonthlyData(trades: Trade[]): MonthlyData[] {
   const sortedMonths = Array.from(monthlyMap.keys()).sort();
   const monthNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
 
-  let cumulativeEquity = 1000;
+  let cumulativeEquity = initialCapital;
 
   return sortedMonths.map((monthKey) => {
     const monthTrades = monthlyMap.get(monthKey)!;
@@ -44,7 +56,7 @@ function calculateMonthlyData(trades: Trade[]): MonthlyData[] {
     const losses = monthTrades.filter((t) => t.result === "stop_loss").length;
     const winRate = monthTrades.length > 0 ? (wins / monthTrades.length) * 100 : 0;
 
-    const pnl = monthTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const pnl = monthTrades.reduce((sum, t) => sum + calculateTradePnl(t), 0);
 
     cumulativeEquity += pnl;
 
@@ -61,8 +73,8 @@ function calculateMonthlyData(trades: Trade[]): MonthlyData[] {
   });
 }
 
-export default function MonthlyComparison({ trades }: MonthlyComparisonProps) {
-  const monthlyData = calculateMonthlyData(trades);
+export default function MonthlyComparison({ trades, initialCapital = 10000 }: MonthlyComparisonProps) {
+  const monthlyData = calculateMonthlyData(trades, initialCapital);
 
   if (monthlyData.length === 0) {
     return (

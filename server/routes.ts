@@ -51,6 +51,24 @@ export async function registerRoutes(
     }
   });
 
+  // Update user's initial capital
+  app.patch("/api/auth/user/capital", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { initialCapital } = req.body;
+      
+      if (typeof initialCapital !== "number" || initialCapital < 0) {
+        return res.status(400).json({ message: "Invalid capital value" });
+      }
+      
+      const user = await storage.updateUserCapital(userId, initialCapital);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating capital:", error);
+      res.status(500).json({ message: "Failed to update capital" });
+    }
+  });
+
   // ============== TRADE ROUTES ==============
   
   // Get current user's trades
