@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Header, { Tab } from "@/components/Header";
 import StatCard from "@/components/StatCard";
 import TradeForm, { TradeFormData } from "@/components/TradeForm";
@@ -18,32 +20,103 @@ import { PerformanceByPair, TradeCountDonut, DirectionBreakdown } from "@/compon
 import EquityProjection from "@/components/EquityProjection";
 import RiskOfRuinTable from "@/components/RiskOfRuinTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const initialTrades: Trade[] = [
-  { id: "1", date: "2024-12-07", time: "09:30", pair: "EURUSD", direction: "long", target: 1.75, stopLoss: 0.5, result: "target", emotion: "Fiducioso", confluencesPro: ["Trend forte", "Supporto testato"], confluencesContro: ["Notizie in arrivo"], imageUrls: [], notes: "" },
-  { id: "2", date: "2024-12-08", time: "14:15", pair: "GBPUSD", direction: "short", target: 1.5, stopLoss: 0.75, result: "stop_loss", emotion: "FOMO", confluencesPro: ["Pattern chiaro"], confluencesContro: ["Contro trend", "Bassa liquidità"], imageUrls: [], notes: "" },
-  { id: "3", date: "2024-12-09", time: "10:00", pair: "USDJPY", direction: "long", target: 2.0, stopLoss: 0.6, result: "breakeven", emotion: "Neutrale", confluencesPro: ["Volume alto", "Livello chiave"], confluencesContro: [], imageUrls: [], notes: "" },
-  { id: "4", date: "2024-12-10", time: "16:45", pair: "EURUSD", direction: "short", target: 1.25, stopLoss: 0.4, result: "target", emotion: "Sicuro", confluencesPro: ["Trend forte", "Pattern chiaro", "Volume alto"], confluencesContro: ["Orario sfavorevole"], imageUrls: [], notes: "" },
-  { id: "5", date: "2024-12-11", time: "11:20", pair: "XAUUSD", direction: "long", target: 3.0, stopLoss: 1.0, result: "target", emotion: "Fiducioso", confluencesPro: ["Trend forte", "Livello chiave"], confluencesContro: [], imageUrls: [], notes: "" },
-  { id: "6", date: "2024-12-11", time: "15:30", pair: "GBPJPY", direction: "short", target: 2.5, stopLoss: 0.8, result: "parziale", emotion: "Neutrale", confluencesPro: ["Pattern chiaro", "Volume alto"], confluencesContro: ["Orario sfavorevole"], imageUrls: [], notes: "" },
-  { id: "7", date: "2024-12-12", time: "09:00", pair: "USDCAD", direction: "long", target: 1.5, stopLoss: 0.5, result: "stop_loss", emotion: "Impaziente", confluencesPro: ["Supporto testato"], confluencesContro: ["Notizie in arrivo", "Pattern debole"], imageUrls: [], notes: "" },
-  { id: "8", date: "2024-12-12", time: "14:00", pair: "EURUSD", direction: "long", target: 1.75, stopLoss: 0.5, result: "target", emotion: "Sicuro", confluencesPro: ["Trend forte", "Volume alto", "Livello chiave"], confluencesContro: [], imageUrls: [], notes: "" },
-  { id: "9", date: "2024-12-13", time: "08:30", pair: "GBPUSD", direction: "short", target: 2.0, stopLoss: 0.6, result: "non_fillato", emotion: "Neutrale", confluencesPro: ["Pattern chiaro", "Trend forte"], confluencesContro: [], imageUrls: [], notes: "" },
-  { id: "10", date: "2024-12-13", time: "11:45", pair: "USDJPY", direction: "long", target: 1.8, stopLoss: 0.5, result: "parziale", emotion: "Fiducioso", confluencesPro: ["Livello chiave", "Volume alto"], confluencesContro: ["Orario sfavorevole"], imageUrls: [], notes: "" },
-];
+import { Loader2 } from "lucide-react";
+import type { Trade as SchemaTrade } from "@shared/schema";
 
 const defaultPairs = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
 const defaultEmotions = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
 const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
 const defaultConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
 
+function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
+  return {
+    id: t.id.toString(),
+    date: t.date,
+    time: t.time || "",
+    pair: t.pair,
+    direction: t.direction as "long" | "short",
+    target: t.target || 0,
+    stopLoss: t.stopLoss || 0,
+    result: t.result as Trade["result"],
+    emotion: t.emotion || "",
+    confluencesPro: t.confluencesPro || [],
+    confluencesContro: t.confluencesContro || [],
+    imageUrls: t.imageUrls || [],
+    notes: t.notes || "",
+  };
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("new-entry");
-  const [trades, setTrades] = useState<Trade[]>(initialTrades);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+
+  const { data: schemaTrades = [], isLoading } = useQuery<SchemaTrade[]>({
+    queryKey: ["/api/trades"],
+  });
+
+  const trades: Trade[] = schemaTrades.map(mapSchemaTradeToTrade);
+
+  const createTradeMutation = useMutation({
+    mutationFn: async (data: TradeFormData) => {
+      return apiRequest("/api/trades", {
+        method: "POST",
+        body: JSON.stringify({
+          date: data.date,
+          time: data.time,
+          pair: data.pair,
+          direction: data.direction,
+          target: parseFloat(data.target) || 0,
+          stopLoss: parseFloat(data.stopLoss) || 0,
+          result: data.result,
+          emotion: data.emotion,
+          confluencesPro: data.confluencesPro,
+          confluencesContro: data.confluencesContro,
+          imageUrls: data.imageUrls,
+          notes: data.notes,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+    },
+  });
+
+  const updateTradeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: TradeFormData }) => {
+      return apiRequest(`/api/trades/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          date: data.date,
+          time: data.time,
+          pair: data.pair,
+          direction: data.direction,
+          target: parseFloat(data.target) || 0,
+          stopLoss: parseFloat(data.stopLoss) || 0,
+          result: data.result,
+          emotion: data.emotion,
+          confluencesPro: data.confluencesPro,
+          confluencesContro: data.confluencesContro,
+          imageUrls: data.imageUrls,
+          notes: data.notes,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+    },
+  });
+
+  const deleteTradeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/trades/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
+    },
+  });
 
   const stats = {
     totalOperations: trades.length,
@@ -58,47 +131,21 @@ export default function Dashboard() {
 
   const handleSubmitTrade = (formData: TradeFormData) => {
     if (editingTrade) {
-      setTrades((prev) =>
-        prev.map((t) =>
-          t.id === editingTrade.id
-            ? {
-                ...t,
-                date: formData.date,
-                time: formData.time,
-                pair: formData.pair,
-                direction: formData.direction,
-                target: parseFloat(formData.target) || 0,
-                stopLoss: parseFloat(formData.stopLoss) || 0,
-                result: formData.result,
-                emotion: formData.emotion,
-                confluencesPro: formData.confluencesPro,
-                confluencesContro: formData.confluencesContro,
-                imageUrls: formData.imageUrls,
-                notes: formData.notes,
-              }
-            : t
-        )
+      updateTradeMutation.mutate(
+        { id: editingTrade.id, data: formData },
+        {
+          onSuccess: () => {
+            setEditingTrade(null);
+            setActiveTab("operations");
+          },
+        }
       );
-      setEditingTrade(null);
-      setActiveTab("operations");
     } else {
-      const newTrade: Trade = {
-        id: Date.now().toString(),
-        date: formData.date,
-        time: formData.time,
-        pair: formData.pair,
-        direction: formData.direction,
-        target: parseFloat(formData.target) || 0,
-        stopLoss: parseFloat(formData.stopLoss) || 0,
-        result: formData.result,
-        emotion: formData.emotion,
-        confluencesPro: formData.confluencesPro,
-        confluencesContro: formData.confluencesContro,
-        imageUrls: formData.imageUrls,
-        notes: formData.notes,
-      };
-      setTrades((prev) => [...prev, newTrade]);
-      setActiveTab("operations");
+      createTradeMutation.mutate(formData, {
+        onSuccess: () => {
+          setActiveTab("operations");
+        },
+      });
     }
   };
 
@@ -118,7 +165,7 @@ export default function Dashboard() {
   };
 
   const handleDeleteTrade = (id: string) => {
-    setTrades((prev) => prev.filter((t) => t.id !== id));
+    deleteTradeMutation.mutate(id);
     if (editingTrade?.id === id) {
       setEditingTrade(null);
     }
@@ -167,6 +214,19 @@ export default function Dashboard() {
     shortWins: trades.filter((t) => t.direction === "short" && t.result === "target").length,
     shortLosses: trades.filter((t) => t.direction === "short" && t.result === "stop_loss").length,
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header activeTab={activeTab} onTabChange={setActiveTab} />
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
