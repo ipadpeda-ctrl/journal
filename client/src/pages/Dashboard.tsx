@@ -61,22 +61,19 @@ export default function Dashboard() {
 
   const createTradeMutation = useMutation({
     mutationFn: async (data: TradeFormData) => {
-      return apiRequest("/api/trades", {
-        method: "POST",
-        body: JSON.stringify({
-          date: data.date,
-          time: data.time,
-          pair: data.pair,
-          direction: data.direction,
-          target: parseFloat(data.target) || 0,
-          stopLoss: parseFloat(data.stopLoss) || 0,
-          result: data.result,
-          emotion: data.emotion,
-          confluencesPro: data.confluencesPro,
-          confluencesContro: data.confluencesContro,
-          imageUrls: data.imageUrls,
-          notes: data.notes,
-        }),
+      return apiRequest("POST", "/api/trades", {
+        date: data.date,
+        time: data.time,
+        pair: data.pair,
+        direction: data.direction,
+        target: parseFloat(data.target) || 0,
+        stopLoss: parseFloat(data.stopLoss) || 0,
+        result: data.result,
+        emotion: data.emotion,
+        confluencesPro: data.confluencesPro,
+        confluencesContro: data.confluencesContro,
+        imageUrls: data.imageUrls,
+        notes: data.notes,
       });
     },
     onSuccess: () => {
@@ -86,22 +83,19 @@ export default function Dashboard() {
 
   const updateTradeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: TradeFormData }) => {
-      return apiRequest(`/api/trades/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          date: data.date,
-          time: data.time,
-          pair: data.pair,
-          direction: data.direction,
-          target: parseFloat(data.target) || 0,
-          stopLoss: parseFloat(data.stopLoss) || 0,
-          result: data.result,
-          emotion: data.emotion,
-          confluencesPro: data.confluencesPro,
-          confluencesContro: data.confluencesContro,
-          imageUrls: data.imageUrls,
-          notes: data.notes,
-        }),
+      return apiRequest("PATCH", `/api/trades/${id}`, {
+        date: data.date,
+        time: data.time,
+        pair: data.pair,
+        direction: data.direction,
+        target: parseFloat(data.target) || 0,
+        stopLoss: parseFloat(data.stopLoss) || 0,
+        result: data.result,
+        emotion: data.emotion,
+        confluencesPro: data.confluencesPro,
+        confluencesContro: data.confluencesContro,
+        imageUrls: data.imageUrls,
+        notes: data.notes,
       });
     },
     onSuccess: () => {
@@ -111,7 +105,7 @@ export default function Dashboard() {
 
   const deleteTradeMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/trades/${id}`, { method: "DELETE" });
+      return apiRequest("DELETE", `/api/trades/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trades"] });
