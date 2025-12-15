@@ -66,9 +66,12 @@ export default function MetricsCards({ trades }: MetricsCardsProps) {
     ? (totalLossAmount / losses.length).toFixed(2) 
     : "0.00";
 
-  const riskReward = parseFloat(avgLoss) > 0 
-    ? (parseFloat(avgWin) / parseFloat(avgLoss)).toFixed(2) 
-    : avgWin;
+  const tradesWithRR = trades.filter((t) => t.rr != null && t.rr > 0);
+  const avgRR = tradesWithRR.length > 0
+    ? (tradesWithRR.reduce((sum, t) => sum + (t.rr || 0), 0) / tradesWithRR.length).toFixed(2)
+    : parseFloat(avgLoss) > 0 
+      ? (parseFloat(avgWin) / parseFloat(avgLoss)).toFixed(2) 
+      : avgWin;
 
   const winRate = trades.length > 0 
     ? (wins.length / trades.length) 
@@ -91,10 +94,10 @@ export default function MetricsCards({ trades }: MetricsCardsProps) {
         tooltip="Rapporto tra profitti totali e perdite totali. Un valore sopra 1.5 è considerato buono."
       />
       <MetricCard
-        label="Risk Reward medio"
-        value={riskReward}
+        label="RR medio"
+        value={avgRR}
         color="blue"
-        tooltip="Rapporto medio tra guadagno e rischio per trade. Un valore sopra 2 indica un buon risk management."
+        tooltip="Risk/Reward medio basato sui valori RR inseriti nei trade. Un valore sopra 2 indica un buon risk management."
       />
       <MetricCard
         label="Expectancy"

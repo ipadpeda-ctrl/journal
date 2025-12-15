@@ -34,6 +34,9 @@ export interface TradeFormData {
   direction: "long" | "short";
   target: string;
   stopLoss: string;
+  slPips: string;
+  tpPips: string;
+  rr: string;
   result: TradeResult;
   emotion: string;
   confluencesPro: string[];
@@ -55,6 +58,9 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
         direction: editingTrade.direction,
         target: editingTrade.target,
         stopLoss: editingTrade.stopLoss,
+        slPips: editingTrade.slPips || "",
+        tpPips: editingTrade.tpPips || "",
+        rr: editingTrade.rr || "",
         result: editingTrade.result,
         emotion: editingTrade.emotion,
         confluencesPro: editingTrade.confluencesPro,
@@ -70,6 +76,9 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
       direction: "long",
       target: "",
       stopLoss: "",
+      slPips: "",
+      tpPips: "",
+      rr: "",
       result: "target",
       emotion: "Neutrale",
       confluencesPro: [],
@@ -77,6 +86,25 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
       imageUrls: [],
       notes: "",
     };
+  };
+
+  const calculateRR = (slPips: string, tpPips: string): string => {
+    const sl = parseFloat(slPips);
+    const tp = parseFloat(tpPips);
+    if (sl > 0 && tp > 0) {
+      return (tp / sl).toFixed(2);
+    }
+    return "";
+  };
+
+  const handleSlPipsChange = (value: string) => {
+    const newRr = calculateRR(value, formData.tpPips);
+    setFormData((prev) => ({ ...prev, slPips: value, rr: newRr }));
+  };
+
+  const handleTpPipsChange = (value: string) => {
+    const newRr = calculateRR(formData.slPips, value);
+    setFormData((prev) => ({ ...prev, tpPips: value, rr: newRr }));
   };
 
   const [formData, setFormData] = useState<TradeFormData>(getInitialFormData);
@@ -216,12 +244,12 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="target">Target</Label>
+            <Label htmlFor="target">Target (R)</Label>
             <Input
               id="target"
               type="number"
               step="0.01"
-              placeholder="0.00"
+              placeholder="1.00"
               value={formData.target}
               onChange={(e) => setFormData((prev) => ({ ...prev, target: e.target.value }))}
               className="font-mono"
@@ -230,16 +258,60 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="stopLoss">Stop Loss</Label>
+            <Label htmlFor="stopLoss">Stop Loss (R)</Label>
             <Input
               id="stopLoss"
               type="number"
               step="0.01"
-              placeholder="0.00"
+              placeholder="1.00"
               value={formData.stopLoss}
               onChange={(e) => setFormData((prev) => ({ ...prev, stopLoss: e.target.value }))}
               className="font-mono"
               data-testid="input-stop-loss"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="slPips">SL (pips)</Label>
+            <Input
+              id="slPips"
+              type="number"
+              step="0.1"
+              placeholder="20"
+              value={formData.slPips}
+              onChange={(e) => handleSlPipsChange(e.target.value)}
+              className="font-mono"
+              data-testid="input-sl-pips"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tpPips">TP (pips)</Label>
+            <Input
+              id="tpPips"
+              type="number"
+              step="0.1"
+              placeholder="40"
+              value={formData.tpPips}
+              onChange={(e) => handleTpPipsChange(e.target.value)}
+              className="font-mono"
+              data-testid="input-tp-pips"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rr">RR (auto)</Label>
+            <Input
+              id="rr"
+              type="number"
+              step="0.01"
+              placeholder="2.00"
+              value={formData.rr}
+              onChange={(e) => setFormData((prev) => ({ ...prev, rr: e.target.value }))}
+              className="font-mono bg-muted/50"
+              data-testid="input-rr"
             />
           </div>
         </div>

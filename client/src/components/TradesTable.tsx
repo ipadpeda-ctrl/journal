@@ -31,6 +31,9 @@ export interface Trade {
   direction: "long" | "short";
   target: number;
   stopLoss: number;
+  slPips?: number;
+  tpPips?: number;
+  rr?: number;
   result: TradeResult;
   pnl?: number;
   emotion: string;
@@ -131,6 +134,7 @@ export default function TradesTable({ trades, onEdit, onDelete, onRowClick }: Tr
               <TableHead className="w-20">Dir.</TableHead>
               <TableHead className="w-20 text-right">Target</TableHead>
               <TableHead className="w-20 text-right">Stop</TableHead>
+              <TableHead className="w-16 text-right">RR</TableHead>
               <TableHead className="w-24">Risultato</TableHead>
               <TableHead className="w-24">Emozione</TableHead>
               <TableHead className="min-w-40">Confluenze</TableHead>
@@ -140,7 +144,7 @@ export default function TradesTable({ trades, onEdit, onDelete, onRowClick }: Tr
           <TableBody>
             {filteredTrades.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
                   Nessuna operazione trovata
                 </TableCell>
               </TableRow>
@@ -171,6 +175,9 @@ export default function TradesTable({ trades, onEdit, onDelete, onRowClick }: Tr
                   </TableCell>
                   <TableCell className="text-right font-mono">{trade.target.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-mono">{trade.stopLoss.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-mono text-blue-400">
+                    {trade.rr ? trade.rr.toFixed(2) : "-"}
+                  </TableCell>
                   <TableCell>{getResultBadge(trade.result)}</TableCell>
                   <TableCell className="text-sm">{trade.emotion}</TableCell>
                   <TableCell>

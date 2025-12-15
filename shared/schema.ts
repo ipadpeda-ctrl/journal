@@ -52,6 +52,9 @@ export const trades = pgTable("trades", {
   direction: varchar("direction").notNull(), // long, short
   target: real("target"),
   stopLoss: real("stop_loss"),
+  slPips: real("sl_pips"), // Stop loss in pips
+  tpPips: real("tp_pips"), // Take profit in pips
+  rr: real("rr"), // Risk/Reward ratio
   result: varchar("result").notNull(), // win, loss, breakeven
   pnl: real("pnl"),
   emotion: varchar("emotion"),
