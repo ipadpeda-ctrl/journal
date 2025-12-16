@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: trading-journal
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: REPLIT_DEPLOYMENT
+        value: "1"
+      - key: SKIP_AUTH
+        value: "true"

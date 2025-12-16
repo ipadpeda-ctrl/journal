@@ -8,6 +8,9 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
+const SKIP_AUTH = process.env.SKIP_AUTH === "true";
+const DEFAULT_USER_ID = "default-user";
+
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -65,6 +68,32 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+
+  if (SKIP_AUTH) {
+    console.log("Auth disabled - using default user for all requests");
+    await storage.upsertUser({
+      id: DEFAULT_USER_ID,
+      email: "user@trading-journal.local",
+      firstName: "Trading",
+      lastName: "User",
+      profileImageUrl: null,
+      role: "super_admin",
+    });
+    
+    app.use((req: any, _res, next) => {
+      req.user = {
+        claims: { sub: DEFAULT_USER_ID },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 365,
+      };
+      req.isAuthenticated = () => true;
+      next();
+    });
+    
+    app.get("/api/login", (_req, res) => res.redirect("/"));
+    app.get("/api/callback", (_req, res) => res.redirect("/"));
+    app.get("/api/logout", (_req, res) => res.redirect("/"));
+    return;
+  }
 
   const config = await getOidcConfig();
 
@@ -129,6 +158,10 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  if (SKIP_AUTH) {
+    return next();
+  }
+
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {
