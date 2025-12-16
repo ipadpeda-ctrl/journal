@@ -16,11 +16,14 @@ import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (mandatory for Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
+  updateUserApproval(id: string, isApproved: string): Promise<User | undefined>;
   updateUserCapital(id: string, initialCapital: number): Promise<User | undefined>;
   isFirstUser(): Promise<boolean>;
 
@@ -52,14 +55,33 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createUser(userData: UpsertUser): Promise<User> {
+    // Check if this is the first user (becomes super_admin with auto-approval)
+    const isFirst = await this.isFirstUser();
+    const role = isFirst ? "super_admin" : "user";
+    const isApproved = isFirst ? "approved" : "pending";
+
+    const [user] = await db
+      .insert(users)
+      .values({ ...userData, role, isApproved })
+      .returning();
+    return user;
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     // Check if this is the first user (becomes super_admin)
     const isFirst = await this.isFirstUser();
     const role = isFirst ? "super_admin" : (userData.role || "user");
+    const isApproved = isFirst ? "approved" : (userData.isApproved || "pending");
 
     const [user] = await db
       .insert(users)
-      .values({ ...userData, role })
+      .values({ ...userData, role, isApproved })
       .onConflictDoUpdate({
         target: users.id,
         set: {
@@ -82,6 +104,15 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async updateUserApproval(id: string, isApproved: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ isApproved, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;

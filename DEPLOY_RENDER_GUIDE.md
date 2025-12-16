@@ -1,16 +1,12 @@
 # Guida Deployment su Render
 
-## IMPORTANTE: Autenticazione
+## Sistema di Autenticazione
 
-Questo progetto usa **Replit Auth** che funziona solo su Replit. Per deployare su Render hai due opzioni:
-
-### Opzione A: Uso personale (senza login)
-Se sei l'unico utente, puoi disabilitare l'autenticazione. Il sito funzionera senza login.
-
-### Opzione B: Multi-utente (richiede configurazione)
-Per supportare piu utenti con login, dovrai implementare un sistema di autenticazione alternativo (es. email/password, Google OAuth, etc.).
-
-**Questa guida assume l'Opzione A (uso personale senza login).**
+Questo progetto include un sistema completo di autenticazione email/password con:
+- Registrazione utenti con approvazione admin
+- Login/logout sicuro
+- Gestione ruoli (super_admin, admin, user)
+- Il primo utente registrato diventa automaticamente Super Admin
 
 ---
 
@@ -52,12 +48,30 @@ Sostituisci `TUO_USERNAME` con il tuo username GitHub.
 3. Nome: `trading-journal-db`
 4. Piano: **Free** (per iniziare)
 5. Clicca **"Create Database"**
-6. Copia l'**Internal Database URL** (ti servirà dopo)
+6. Copia l'**Internal Database URL** (ti servira dopo)
 
 ### Opzione B: Usa Neon, Supabase o altro
 - Crea un database PostgreSQL e copia la connection string
 
-## Passo 5: Deploy su Render
+## Passo 5: Inizializza il database (IMPORTANTE!)
+
+Prima del deploy, devi creare le tabelle nel database.
+
+1. Nella cartella del progetto sul tuo PC, crea un file `.env` con:
+   ```
+   DATABASE_URL=postgresql://TUA_CONNECTION_STRING
+   ```
+   (Usa la connection string del passo 4)
+
+2. Esegui nel terminale:
+   ```bash
+   npm install
+   npx drizzle-kit push
+   ```
+
+Questo creera tutte le tabelle necessarie (users, trades, sessions, diary, goals).
+
+## Passo 6: Deploy su Render
 
 1. Su Render, clicca **"New"** > **"Web Service"**
 2. Connetti il tuo account GitHub
@@ -78,34 +92,34 @@ Sostituisci `TUO_USERNAME` con il tuo username GitHub.
 | `DATABASE_URL` | (incolla la connection string del database) |
 | `SESSION_SECRET` | (genera una stringa random, es: `openssl rand -hex 32`) |
 | `NODE_ENV` | `production` |
-| `REPLIT_DEPLOYMENT` | `1` |
-| `SKIP_AUTH` | `true` |
 
 6. Clicca **"Create Web Service"**
 
-## Passo 6: Inizializza il database
-
-Dopo il primo deploy, devi creare le tabelle nel database. Hai due opzioni:
-
-### Opzione A: Da Render Shell (se disponibile)
-1. Su Render, vai al tuo Web Service
-2. Clicca sulla tab **"Shell"**
-3. Esegui: `npx drizzle-kit push`
-
-### Opzione B: Esegui localmente prima del deploy
-1. Nella cartella del progetto sul tuo PC, crea un file `.env` con:
-   ```
-   DATABASE_URL=postgresql://TUA_CONNECTION_STRING
-   ```
-2. Esegui: `npm install && npx drizzle-kit push`
-
-Questo creerà tutte le tabelle necessarie (users, trades, sessions, diary, goals).
-
-## Passo 7: Verifica
+## Passo 7: Primo Accesso
 
 1. Attendi che il deploy sia completato (status: **Live**)
-2. Clicca sull'URL del tuo sito (es: `https://trading-journal-xxxx.onrender.com`)
-3. Il sito dovrebbe caricarsi correttamente
+2. Vai all'URL del tuo sito (es: `https://trading-journal-xxxx.onrender.com`)
+3. Clicca **"Registrati"** e crea il tuo account
+4. **IMPORTANTE**: Il primo utente registrato diventa automaticamente Super Admin!
+5. Ora puoi approvare o rifiutare le registrazioni di altri utenti dalla pagina Admin
+
+## Come Funziona l'Approvazione Utenti
+
+1. Un nuovo utente si registra sul sito
+2. Il suo account e' "In Attesa" di approvazione
+3. L'admin va nella pagina Admin > Utenti
+4. L'admin puo:
+   - **Approvare**: l'utente puo accedere
+   - **Rifiutare**: l'utente non puo accedere
+5. Solo gli utenti approvati possono usare l'applicazione
+
+## Variabili d'ambiente
+
+| Variabile | Descrizione | Obbligatoria |
+|-----------|-------------|--------------|
+| `DATABASE_URL` | Connection string PostgreSQL | Si |
+| `SESSION_SECRET` | Chiave segreta per le sessioni (minimo 32 caratteri) | Si |
+| `NODE_ENV` | Deve essere `production` | Si |
 
 ## Troubleshooting
 
@@ -113,27 +127,23 @@ Questo creerà tutte le tabelle necessarie (users, trades, sessions, diary, goal
 - Controlla i **Logs** su Render per vedere gli errori
 - Verifica che DATABASE_URL sia corretto
 
-### Errore database
-- Assicurati di aver eseguito `npm run db:push`
-- Verifica che il database sia attivo
+### Errore "relation does not exist"
+- Assicurati di aver eseguito `npx drizzle-kit push` prima del deploy
+- Verifica che il database sia attivo e raggiungibile
+
+### Non riesco a registrarmi
+- Verifica che il database sia connesso correttamente
+- Controlla i log per errori specifici
 
 ### Il free tier si spegne
-- Il piano gratuito di Render mette il sito in "sleep" dopo 15 minuti di inattività
+- Il piano gratuito di Render mette il sito in "sleep" dopo 15 minuti di inattivita
 - Il primo accesso dopo lo sleep richiede ~30 secondi
 - Per evitarlo, puoi passare a un piano a pagamento
 
-## Variabili d'ambiente necessarie
-
-| Variabile | Descrizione |
-|-----------|-------------|
-| `DATABASE_URL` | Connection string PostgreSQL |
-| `SESSION_SECRET` | Chiave segreta per le sessioni (minimo 32 caratteri) |
-| `NODE_ENV` | Deve essere `production` |
-| `REPLIT_DEPLOYMENT` | Deve essere `1` |
-| `SKIP_AUTH` | Imposta a `true` per disabilitare il login (uso personale) |
-
 ## Note importanti
 
-- Il piano gratuito di Render ha limitazioni (si spegne dopo inattività)
+- Il piano gratuito di Render ha limitazioni (si spegne dopo inattivita)
 - Il database gratuito di Render scade dopo 90 giorni
 - Considera un piano a pagamento per uso continuativo
+- Le password sono criptate con bcrypt (sicuro)
+- Le sessioni durano 7 giorni

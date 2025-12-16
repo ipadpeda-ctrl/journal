@@ -47,6 +47,15 @@ The application follows a hybrid design approach inspired by Linear, TradingView
 - Emotional state tracking per trade
 - Weekly recap and mood tracker
 - Configurable pairs, emotions, and confluence options
+- Risk/Reward (RR) ratio calculation and display
+
+### Authentication Flow
+1. User registers with email/password
+2. First registered user becomes super_admin (auto-approved)
+3. Subsequent users are "pending" until admin approves
+4. Admins can approve, reject, or revoke user access
+5. Only approved users can access the trading journal
+6. Super admins can promote users to admin role
 
 ## External Dependencies
 
@@ -67,10 +76,13 @@ The application follows a hybrid design approach inspired by Linear, TradingView
 - **esbuild**: Server-side bundling for production
 - **tsx**: TypeScript execution for development
 
-### Session & Security
-- **express-session**: Session management
+### Authentication & Security
+- **express-session**: Session management with PostgreSQL store
 - **connect-pg-simple**: PostgreSQL session store
-- **passport / passport-local**: Authentication (prepared but not fully implemented)
+- **passport / passport-local**: Email/password authentication
+- **bcryptjs**: Password hashing
+- **User approval system**: Admin-controlled access (pending, approved, rejected)
+- **Role-based access**: super_admin, admin, user roles
 
 ### Form Handling
 - **react-hook-form**: Form state management

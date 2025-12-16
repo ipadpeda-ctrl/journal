@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award } from "lucide-react";
+import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
 import type { User, Trade } from "@shared/schema";
 
@@ -51,6 +51,15 @@ export default function AdminDashboard() {
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
       return apiRequest("PATCH", `/api/admin/users/${userId}/role`, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+  });
+
+  const updateApprovalMutation = useMutation({
+    mutationFn: async ({ userId, isApproved }: { userId: string; isApproved: string }) => {
+      return apiRequest("PATCH", `/api/admin/users/${userId}/approval`, { isApproved });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
@@ -146,6 +155,19 @@ export default function AdminDashboard() {
         return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30"><UserIcon className="w-3 h-3 mr-1" />User</Badge>;
     }
   };
+
+  const getApprovalBadge = (isApproved: string) => {
+    switch (isApproved) {
+      case "approved":
+        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30"><CheckCircle2 className="w-3 h-3 mr-1" />Approvato</Badge>;
+      case "rejected":
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30"><XCircle className="w-3 h-3 mr-1" />Rifiutato</Badge>;
+      default:
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30"><Clock className="w-3 h-3 mr-1" />In Attesa</Badge>;
+    }
+  };
+
+  const pendingUsers = users.filter(u => u.isApproved === "pending");
 
   const getResultBadge = (result: string) => {
     switch (result) {
@@ -248,15 +270,51 @@ export default function AdminDashboard() {
                 <CardTitle>Gestione Utenti</CardTitle>
               </CardHeader>
               <CardContent>
+                {pendingUsers.length > 0 && (
+                  <div className="mb-4 p-4 rounded-md bg-yellow-500/10 border border-yellow-500/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="w-4 h-4 text-yellow-500" />
+                      <span className="font-medium text-yellow-500">{pendingUsers.length} utenti in attesa di approvazione</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {pendingUsers.map((u) => (
+                        <div key={u.id} className="flex items-center gap-2 bg-background rounded-md px-3 py-2">
+                          <span className="text-sm">{u.firstName} {u.lastName} ({u.email})</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-emerald-500 border-emerald-500/30"
+                            onClick={() => updateApprovalMutation.mutate({ userId: u.id, isApproved: "approved" })}
+                            disabled={updateApprovalMutation.isPending}
+                            data-testid={`button-approve-${u.id}`}
+                          >
+                            <CheckCircle2 className="w-3 h-3 mr-1" /> Approva
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-red-500 border-red-500/30"
+                            onClick={() => updateApprovalMutation.mutate({ userId: u.id, isApproved: "rejected" })}
+                            disabled={updateApprovalMutation.isPending}
+                            data-testid={`button-reject-${u.id}`}
+                          >
+                            <XCircle className="w-3 h-3 mr-1" /> Rifiuta
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Utente</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Stato</TableHead>
                       <TableHead>Ruolo</TableHead>
                       <TableHead className="text-right">Trades</TableHead>
                       <TableHead className="text-right">Win Rate</TableHead>
-                      {isSuperAdmin && <TableHead>Azioni</TableHead>}
+                      <TableHead>Azioni</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -278,30 +336,49 @@ export default function AdminDashboard() {
                             </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                          <TableCell>{getApprovalBadge(u.isApproved)}</TableCell>
                           <TableCell>{getRoleBadge(u.role)}</TableCell>
                           <TableCell className="text-right font-mono">{stats.totalTrades}</TableCell>
                           <TableCell className="text-right font-mono">{stats.winRate.toFixed(1)}%</TableCell>
-                          {isSuperAdmin && (
-                            <TableCell>
-                              {u.role !== "super_admin" && (
+                          <TableCell>
+                            {u.role !== "super_admin" && (
+                              <div className="flex items-center gap-2">
                                 <Select
-                                  value={u.role}
-                                  onValueChange={(role) =>
-                                    updateRoleMutation.mutate({ userId: u.id, role })
+                                  value={u.isApproved}
+                                  onValueChange={(isApproved) =>
+                                    updateApprovalMutation.mutate({ userId: u.id, isApproved })
                                   }
-                                  disabled={updateRoleMutation.isPending}
+                                  disabled={updateApprovalMutation.isPending}
                                 >
-                                  <SelectTrigger className="w-28" data-testid={`select-role-${u.id}`}>
+                                  <SelectTrigger className="w-28" data-testid={`select-approval-${u.id}`}>
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="user">User</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="approved">Approvato</SelectItem>
+                                    <SelectItem value="pending">In Attesa</SelectItem>
+                                    <SelectItem value="rejected">Rifiutato</SelectItem>
                                   </SelectContent>
                                 </Select>
-                              )}
-                            </TableCell>
-                          )}
+                                {isSuperAdmin && (
+                                  <Select
+                                    value={u.role}
+                                    onValueChange={(role) =>
+                                      updateRoleMutation.mutate({ userId: u.id, role })
+                                    }
+                                    disabled={updateRoleMutation.isPending}
+                                  >
+                                    <SelectTrigger className="w-24" data-testid={`select-role-${u.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="user">User</SelectItem>
+                                      <SelectItem value="admin">Admin</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })}

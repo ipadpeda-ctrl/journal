@@ -25,15 +25,16 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table with roles
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// User storage table with roles and authentication
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
+  email: varchar("email").unique().notNull(),
+  passwordHash: varchar("password_hash"),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").notNull().default("user"), // super_admin, admin, user
+  isApproved: varchar("is_approved").notNull().default("pending"), // pending, approved, rejected
   initialCapital: real("initial_capital").default(10000),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -41,6 +42,24 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Registration schema for new users
+export const registerUserSchema = z.object({
+  email: z.string().email("Email non valida"),
+  password: z.string().min(6, "La password deve avere almeno 6 caratteri"),
+  firstName: z.string().min(1, "Nome richiesto"),
+  lastName: z.string().min(1, "Cognome richiesto"),
+});
+
+export type RegisterUser = z.infer<typeof registerUserSchema>;
+
+// Login schema
+export const loginUserSchema = z.object({
+  email: z.string().email("Email non valida"),
+  password: z.string().min(1, "Password richiesta"),
+});
+
+export type LoginUser = z.infer<typeof loginUserSchema>;
 
 // Trades table connected to users
 export const trades = pgTable("trades", {

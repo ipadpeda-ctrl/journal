@@ -10,6 +10,7 @@ import {
 import { Moon, Sun, TrendingUp, LogOut, Shield, User as UserIcon } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 type Tab = "new-entry" | "operations" | "calendario" | "statistiche" | "diary" | "goals" | "settings" | "admin";
 
@@ -108,11 +109,17 @@ export default function Header({ activeTab, onTabChange }: HeaderProps) {
               </div>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <a href="/api/logout" className="cursor-pointer" data-testid="button-logout">
-                <LogOut className="mr-2 h-4 w-4" />
-                Esci
-              </a>
+            <DropdownMenuItem
+              onClick={async () => {
+                await apiRequest("POST", "/api/auth/logout");
+                queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                window.location.href = "/login";
+              }}
+              className="cursor-pointer"
+              data-testid="button-logout"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Esci
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
