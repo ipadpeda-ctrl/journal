@@ -116,6 +116,13 @@ export default function Login() {
                 )}
                 Accedi
               </Button>
+              <span
+                className="text-sm text-primary cursor-pointer hover:underline"
+                onClick={() => setLocation("/forgot-password")}
+                data-testid="link-forgot-password"
+              >
+                Password dimenticata?
+              </span>
               <p className="text-sm text-muted-foreground text-center">
                 Non hai un account?{" "}
                 <span

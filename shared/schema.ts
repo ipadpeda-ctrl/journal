@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   role: varchar("role").notNull().default("user"), // super_admin, admin, user
   isApproved: varchar("is_approved").notNull().default("pending"), // pending, approved, rejected
   initialCapital: real("initial_capital").default(10000),
+  resetToken: varchar("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

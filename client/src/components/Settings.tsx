@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X, Save, Wallet, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ChangePassword from "@/components/ChangePassword";
 
 interface SettingsProps {
   pairs: string[];
@@ -123,6 +124,8 @@ export default function Settings({
           </Button>
         </div>
       </Card>
+
+      <ChangePassword />
 
       <Card className="p-6">
         <h2 className="text-lg font-medium mb-4">Coppie di Trading</h2>

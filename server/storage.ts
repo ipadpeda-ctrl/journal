@@ -19,12 +19,16 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: string, role: string): Promise<User | undefined>;
   updateUserApproval(id: string, isApproved: string): Promise<User | undefined>;
   updateUserCapital(id: string, initialCapital: number): Promise<User | undefined>;
+  updateUserPassword(id: string, passwordHash: string): Promise<User | undefined>;
+  setResetToken(id: string, token: string, expiry: Date): Promise<User | undefined>;
+  clearResetToken(id: string): Promise<User | undefined>;
   isFirstUser(): Promise<boolean>;
 
   // Trade operations
@@ -130,6 +134,41 @@ export class DatabaseStorage implements IStorage {
   async isFirstUser(): Promise<boolean> {
     const result = await db.select({ count: sql<number>`count(*)` }).from(users);
     return result[0].count === 0;
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.resetToken, token));
+    return user;
+  }
+
+  async updateUserPassword(id: string, passwordHash: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async setResetToken(id: string, token: string, expiry: Date): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ resetToken: token, resetTokenExpiry: expiry, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async clearResetToken(id: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ resetToken: null, resetTokenExpiry: null, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
   }
 
   // Trade operations

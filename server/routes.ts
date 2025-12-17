@@ -1,9 +1,12 @@
 import type { Express, RequestHandler } from "express";
 import type { Server } from "http";
 import passport from "passport";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { setupLocalAuth, isAuthenticated, isAdmin, isSuperAdmin, hashPassword } from "./localAuth";
 import { insertTradeSchema, insertDiarySchema, insertGoalSchema, registerUserSchema, loginUserSchema } from "@shared/schema";
+import { sendPasswordResetEmail } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -106,6 +109,103 @@ export async function registerRoutes(
       }
       res.json({ message: "Logout effettuato" });
     });
+  });
+
+  // Request password reset
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email richiesta" });
+      }
+
+      const user = await storage.getUserByEmail(email.toLowerCase());
+      if (!user) {
+        return res.json({ message: "Se l'email esiste, riceverai un link per il reset" });
+      }
+
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const expiry = new Date(Date.now() + 3600000);
+
+      await storage.setResetToken(user.id, resetToken, expiry);
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const emailSent = await sendPasswordResetEmail(user.email, resetToken, baseUrl);
+
+      if (!emailSent) {
+        return res.status(500).json({ message: "Errore nell'invio dell'email. Verifica che RESEND_API_KEY sia configurata." });
+      }
+
+      res.json({ message: "Se l'email esiste, riceverai un link per il reset" });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Errore durante la richiesta" });
+    }
+  });
+
+  // Reset password with token
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token e password richiesti" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: "La password deve avere almeno 6 caratteri" });
+      }
+
+      const user = await storage.getUserByResetToken(token);
+      if (!user) {
+        return res.status(400).json({ message: "Token non valido o scaduto" });
+      }
+
+      if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
+        await storage.clearResetToken(user.id);
+        return res.status(400).json({ message: "Token scaduto. Richiedi un nuovo reset." });
+      }
+
+      const passwordHash = await hashPassword(password);
+      await storage.updateUserPassword(user.id, passwordHash);
+      await storage.clearResetToken(user.id);
+
+      res.json({ message: "Password aggiornata con successo" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Errore durante il reset" });
+    }
+  });
+
+  // Change password (logged in user)
+  app.post("/api/auth/change-password", isAuthenticated, async (req: any, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Password attuale e nuova richieste" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "La nuova password deve avere almeno 6 caratteri" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user || !user.passwordHash) {
+        return res.status(400).json({ message: "Utente non trovato" });
+      }
+
+      const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValid) {
+        return res.status(400).json({ message: "Password attuale non corretta" });
+      }
+
+      const passwordHash = await hashPassword(newPassword);
+      await storage.updateUserPassword(user.id, passwordHash);
+
+      res.json({ message: "Password cambiata con successo" });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ message: "Errore durante il cambio password" });
+    }
   });
 
   // Get current user

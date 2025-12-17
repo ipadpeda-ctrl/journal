@@ -185,7 +185,16 @@ Solo il **Super Amministratore** può promuovere altri utenti ad amministratori.
 
 ### "Ho dimenticato la password"
 
-Al momento non c'è una funzione automatica per reimpostare la password. Contatta l'amministratore del sistema per assistenza.
+**Soluzione:**
+1. Vai alla pagina di login
+2. Clicca su "Password dimenticata?"
+3. Inserisci la tua email
+4. Riceverai un'email con un link per reimpostare la password
+5. Clicca sul link e inserisci la nuova password
+
+**Nota:** Il link scade dopo 1 ora. Se non ricevi l'email, controlla la cartella spam.
+
+**Importante:** Per funzionare, l'amministratore deve aver configurato il servizio email (Resend). Vedi la sezione "Configurazione Email" più sotto.
 
 ---
 
@@ -223,6 +232,51 @@ Al momento non c'è una funzione automatica per reimpostare la password. Contatt
 
 ---
 
+## Configurazione Email (Per Amministratori)
+
+Per abilitare il reset password via email, devi configurare **Resend** (servizio gratuito fino a 3000 email/mese).
+
+### Passaggi:
+
+**Passo 1:** Vai su [resend.com](https://resend.com) e crea un account gratuito.
+
+**Passo 2:** Nella dashboard di Resend, vai su "API Keys" e crea una nuova chiave.
+
+**Passo 3:** Copia la chiave (inizia con `re_...`).
+
+**Passo 4:** Aggiungi la chiave alle variabili d'ambiente del tuo server:
+```
+RESEND_API_KEY=re_la_tua_chiave_qui
+```
+
+**Passo 5:** (Opzionale) Configura l'indirizzo mittente:
+```
+EMAIL_FROM=Trading Journal <noreply@tuodominio.com>
+```
+
+**Nota:** Se non configuri un dominio personalizzato su Resend, le email verranno inviate da `noreply@resend.dev`.
+
+---
+
+## Cambiare la Password
+
+Se sei già loggato e vuoi cambiare la tua password:
+
+**Passo 1:** Vai nelle **Impostazioni** (icona ingranaggio nel menu).
+
+**Passo 2:** Scorri fino alla sezione "Cambia Password".
+
+**Passo 3:** Inserisci:
+- La tua password attuale
+- La nuova password (minimo 6 caratteri)
+- Conferma la nuova password
+
+**Passo 4:** Clicca "Cambia password".
+
+**Passo 5:** Vedrai un messaggio di conferma. Da ora userai la nuova password.
+
+---
+
 ## Glossario
 
 | Termine | Significato |
@@ -234,6 +288,8 @@ Al momento non c'è una funzione automatica per reimpostare la password. Contatt
 | **Super Admin** | Amministratore principale con tutti i privilegi |
 | **Approvazione** | Permesso dato da un admin per far entrare un utente |
 | **Ruolo** | Il livello di permessi di un utente (user, admin, super_admin) |
+| **Reset Password** | Reimpostare la password quando la dimentichi |
+| **Resend** | Servizio per inviare email (usato per il reset password) |
 
 ---
 
