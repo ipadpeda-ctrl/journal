@@ -111,6 +111,54 @@ export async function registerRoutes(
     });
   });
 
+  // ============== SETUP ADMIN (ONE-TIME USE) ==============
+  // IMPORTANTE: Rimuovi questo endpoint dopo averlo usato!
+  // Usa: /api/setup-admin?key=TradingJournal2024Setup
+  app.get("/api/setup-admin", async (req, res) => {
+    try {
+      // Chiave segreta per sicurezza
+      const secretKey = "TradingJournal2024Setup";
+      if (req.query.key !== secretKey) {
+        return res.status(403).json({ 
+          success: false,
+          message: "Accesso negato. Chiave non valida." 
+        });
+      }
+
+      const targetEmail = "ipadpeda@gmail.com";
+      
+      const user = await storage.getUserByEmail(targetEmail);
+      if (!user) {
+        return res.status(404).json({ 
+          success: false,
+          message: `Utente con email ${targetEmail} non trovato. Registrati prima.` 
+        });
+      }
+
+      if (user.role === "super_admin" && user.isApproved === "approved") {
+        return res.json({ 
+          success: true,
+          message: "Sei già Super Admin approvato! Puoi fare login." 
+        });
+      }
+
+      // Promote to super_admin and approve
+      await storage.updateUserRole(user.id, "super_admin");
+      await storage.updateUserApproval(user.id, "approved");
+
+      res.json({ 
+        success: true,
+        message: "Fatto! Ora sei Super Admin. Vai al sito e fai login con la tua email e password." 
+      });
+    } catch (error: any) {
+      console.error("Setup admin error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Errore durante la promozione a Super Admin" 
+      });
+    }
+  });
+
   // Request password reset
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
