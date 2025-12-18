@@ -55,7 +55,8 @@ export default function TradesTable({ trades, onEdit, onDelete, onRowClick }: Tr
   const [filterPair, setFilterPair] = useState<string>("all");
   const [filterResult, setFilterResult] = useState<string>("all");
 
-  const uniquePairs = Array.from(new Set(trades.map((t) => t.pair)));
+  // FIX: Filtriamo le coppie vuote per evitare il crash del componente Select
+  const uniquePairs = Array.from(new Set(trades.map((t) => t.pair).filter((p) => p && p.trim() !== "")));
 
   const filteredTrades = trades.filter((trade) => {
     const matchesSearch =
@@ -158,7 +159,7 @@ export default function TradesTable({ trades, onEdit, onDelete, onRowClick }: Tr
                 >
                   <TableCell className="font-mono text-sm">{trade.date}</TableCell>
                   <TableCell className="font-mono text-sm">{trade.time}</TableCell>
-                  <TableCell className="font-medium">{trade.pair}</TableCell>
+                  <TableCell className="font-medium">{trade.pair || "-"}</TableCell>
                   <TableCell>
                     <span
                       className={`inline-flex items-center gap-1 ${
