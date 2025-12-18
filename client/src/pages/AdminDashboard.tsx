@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter"; // <--- Importante per la navigazione
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import Header, { Tab } from "@/components/Header";
@@ -28,7 +29,6 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 
 import type { User, Trade } from "@shared/schema";
 
 // --- ERROR BOUNDARY COMPONENT ---
-// Questo componente impedisce che un errore in una parte della UI faccia crashare tutto
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
@@ -73,15 +73,41 @@ interface AdminTrade extends Trade {
 
 export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("admin");
+  
+  // --- NUOVA LOGICA DI NAVIGAZIONE ---
+  const [location, setLocation] = useLocation();
 
-  // Debug: controlla in console se il ruolo è corretto
-  useEffect(() => {
-    if (user) {
-      console.log("Current User Role:", user.role);
+  const handleTabChange = (tab: Tab) => {
+    // Mappa i tab agli URL corretti del tuo sito
+    switch (tab) {
+      case "dashboard":
+        setLocation("/");
+        break;
+      case "journal": 
+        setLocation("/journal"); // Verifica se il tuo URL è /journal o /diary
+        break;
+      case "calendar":
+        setLocation("/calendar");
+        break;
+      case "goals":
+        setLocation("/goals");
+        break;
+      case "settings":
+        setLocation("/settings");
+        break;
+      case "admin":
+        // Siamo già qui
+        break;
+      default:
+        console.warn("Tab sconosciuto:", tab);
+        break;
     }
-  }, [user]);
+  };
+  // -----------------------------------
 
+  // Nota: activeTab qui è "admin" perché siamo nella pagina admin.
+  // Quando clicchi su altro, handleTabChange ti porterà via da questa pagina.
+  
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<User[]>({
@@ -114,13 +140,12 @@ export default function AdminDashboard() {
     },
   });
 
-  // Se stiamo ancora caricando l'utente o se siamo admin e stiamo caricando i dati
   const isLoading = authLoading || (isAdmin && (usersLoading || tradesLoading));
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header activeTab={activeTab} onTabChange={setActiveTab} />
+        <Header activeTab="admin" onTabChange={handleTabChange} />
         <main className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex flex-col items-center justify-center h-64 gap-4">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -131,11 +156,10 @@ export default function AdminDashboard() {
     );
   }
 
-  // Se non è admin (o se il ruolo non è stato caricato correttamente)
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background">
-        <Header activeTab={activeTab} onTabChange={setActiveTab} />
+        <Header activeTab="admin" onTabChange={handleTabChange} />
         <main className="max-w-7xl mx-auto px-4 py-6">
           <Card className="p-8 text-center border-red-100 bg-red-50/50">
             <Shield className="w-12 h-12 mx-auto mb-4 text-red-500" />
@@ -149,11 +173,10 @@ export default function AdminDashboard() {
     );
   }
 
-  // Se ci sono errori nel caricamento dati API
   if (usersError || tradesError) {
     return (
       <div className="min-h-screen bg-background">
-        <Header activeTab={activeTab} onTabChange={setActiveTab} />
+        <Header activeTab="admin" onTabChange={handleTabChange} />
         <main className="max-w-7xl mx-auto px-4 py-6">
           <Card className="p-6 border-red-200 bg-red-50">
             <h3 className="text-lg font-bold text-red-800">Errore Caricamento Dati</h3>
@@ -167,8 +190,6 @@ export default function AdminDashboard() {
     );
   }
 
-  // --- CALCOLI SICURI ---
-  // Eseguiamo i calcoli solo se i dati esistono e sono array
   const safeUsers = Array.isArray(users) ? users : [];
   const safeTrades = Array.isArray(trades) ? trades : [];
 
@@ -187,17 +208,11 @@ export default function AdminDashboard() {
     .sort((a, b) => b.stats.winRate - a.stats.winRate)
     .slice(0, 10);
 
-  const leaderboardByPnL = safeUsers
-    .map((u) => ({ ...u, stats: getUserStats(u.id) }))
-    .filter((u) => u.stats.totalTrades >= 1)
-    .sort((a, b) => b.stats.pnl - a.stats.pnl)
-    .slice(0, 10);
-
   const userTradesChartData = safeUsers
     .map((u) => ({
       name: u.firstName || u.email?.split("@")[0] || "User",
       trades: getUserStats(u.id).totalTrades,
-      winRate: Math.round(getUserStats(u.id).winRate), // Arrotonda per evitare problemi coi grafici
+      winRate: Math.round(getUserStats(u.id).winRate),
     }))
     .filter((u) => u.trades > 0)
     .sort((a, b) => b.trades - a.trades)
@@ -257,7 +272,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* HEADER CON NAVIGAZIONE CORRETTA */}
+      <Header activeTab="admin" onTabChange={handleTabChange} />
 
       <ErrorBoundary>
         <main className="max-w-7xl mx-auto px-4 py-6">
