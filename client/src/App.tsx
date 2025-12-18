@@ -41,14 +41,21 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      {/* 1. Rotta Admin specifica */}
       <Route path="/admin" component={AdminDashboard} />
-      <Route path="/login">
-        <Redirect to="/" />
-      </Route>
-      <Route path="/register">
-        <Redirect to="/" />
-      </Route>
+
+      {/* 2. Rotte della Dashboard Utente */}
+      <Route path="/" component={Dashboard} />
+      <Route path="/operations" component={Dashboard} />
+      <Route path="/calendar" component={Dashboard} />
+      <Route path="/stats" component={Dashboard} />
+      <Route path="/diary" component={Dashboard} />
+      <Route path="/goals" component={Dashboard} />
+      <Route path="/settings" component={Dashboard} />
+
+      {/* 3. Redirect e 404 */}
+      <Route path="/login"><Redirect to="/" /></Route>
+      <Route path="/register"><Redirect to="/" /></Route>
       <Route component={NotFound} />
     </Switch>
   );
