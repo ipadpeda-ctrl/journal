@@ -53,44 +53,23 @@ interface AdminTrade extends Trade { userName?: string; userEmail?: string; }
 
 export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
-  
-  // --- NAVIGAZIONE CORRETTA ---
   const [location, setLocation] = useLocation();
 
+  // --- NAVIGAZIONE AGGIORNATA ---
   const handleTabChange = (tab: Tab) => {
-    // Invece di navigare su rotte che non esistono, navighiamo sulla root (/)
-    // passando un parametro query (?tab=...) che Dashboard.tsx leggerà
     switch (tab) {
-      case "operations":
-        setLocation("/?tab=operations");
-        break;
-      case "new-entry":
-        setLocation("/?tab=new-entry");
-        break;
-      case "calendario":
-        setLocation("/?tab=calendario");
-        break;
-      case "statistiche":
-        setLocation("/?tab=statistiche");
-        break;
-      case "diary":
-        setLocation("/?tab=diary");
-        break;
-      case "goals":
-        setLocation("/?tab=goals");
-        break;
-      case "settings":
-        setLocation("/?tab=settings");
-        break;
-      case "admin":
-        // Restiamo qui
-        break;
-      default:
-        console.warn("Tab non gestito:", tab);
-        break;
+      case "operations": setLocation("/operations"); break;
+      case "new-entry": setLocation("/"); break;
+      case "calendario": setLocation("/calendar"); break;
+      case "statistiche": setLocation("/stats"); break;
+      case "diary": setLocation("/diary"); break;
+      case "goals": setLocation("/goals"); break;
+      case "settings": setLocation("/settings"); break;
+      case "admin": break; // Siamo già qui
+      default: console.warn("Tab non gestito:", tab); break;
     }
   };
-  // ---------------------------
+  // -----------------------------
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
@@ -243,7 +222,6 @@ export default function AdminDashboard() {
             <p className="text-muted-foreground">Panoramica di tutti gli utenti e le operazioni (Ruolo: {user?.role})</p>
           </div>
           
-          {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><Users className="w-4 h-4" />Utenti Totali</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{totalStats.totalUsers}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2"><BarChart3 className="w-4 h-4" />Operazioni Totali</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{totalStats.totalTrades}</div></CardContent></Card>

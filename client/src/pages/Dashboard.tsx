@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter"; // Aggiunto hook per URL
+import { useLocation } from "wouter"; // Importante
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import Header, { Tab } from "@/components/Header";
@@ -73,12 +73,7 @@ function exportTradesToCSV(trades: Trade[]) {
     t.confluencesContro.join("; "),
     t.notes.replace(/"/g, '""'),
   ]);
-  
-  const csvContent = [
-    headers.join(","),
-    ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
-  ].join("\n");
-  
+  const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
   const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -90,7 +85,7 @@ function exportTradesToCSV(trades: Trade[]) {
   URL.revokeObjectURL(url);
 }
 
-// Helper functions for calculations
+// Helpers Calcoli
 function calculateProfitFactor(trades: Trade[]): string {
   const wins = trades.filter((t) => t.result === "target");
   const losses = trades.filter((t) => t.result === "stop_loss");
@@ -157,7 +152,6 @@ function calculateMoodData(trades: Trade[]) {
 function calculateConfluenceStats(trades: Trade[]) {
   const allPro = defaultConfluencesPro;
   const allContro = defaultConfluencesContro;
-  
   const calcStats = (items: string[], type: 'pro' | 'contro') => items.map(conf => {
     const confTrades = trades.filter(t => type === 'pro' ? t.confluencesPro.includes(conf) : t.confluencesContro.includes(conf));
     const count = confTrades.length;
@@ -166,7 +160,6 @@ function calculateConfluenceStats(trades: Trade[]) {
     const winRate = count > 0 ? (wins / count) * 100 : 0;
     return { name: conf, count, wins, losses, winRate };
   });
-
   return { confluencesPro: calcStats(allPro, 'pro'), confluencesContro: calcStats(allContro, 'contro') };
 }
 
@@ -189,20 +182,41 @@ function calculatePerformanceByPair(trades: Trade[]) {
 export default function Dashboard() {
   const { user } = useAuth();
   const initialCapital = user?.initialCapital ?? 10000;
-  
-  // --- INIZIO MODIFICA: Inizializzazione Tab da URL ---
-  const [activeTab, setActiveTab] = useState<Tab>(() => {
-    // Controlla se c'è un parametro ?tab= nell'URL
-    const searchParams = new URLSearchParams(window.location.search);
-    const tabParam = searchParams.get("tab");
-    const validTabs = ["new-entry", "operations", "calendario", "statistiche", "diary", "goals", "settings"];
-    
-    if (tabParam && validTabs.includes(tabParam)) {
-      return tabParam as Tab;
-    }
+  const [location, setLocation] = useLocation();
+
+  // --- LOGICA DI NAVIGAZIONE E URL ---
+  const getTabFromPath = (path: string): Tab => {
+    if (path === "/operations") return "operations";
+    if (path === "/calendar") return "calendario";
+    if (path === "/stats") return "statistiche";
+    if (path === "/diary") return "diary";
+    if (path === "/goals") return "goals";
+    if (path === "/settings") return "settings";
     return "new-entry";
-  });
-  // --- FINE MODIFICA ---
+  };
+
+  const [activeTab, setActiveTab] = useState<Tab>(() => getTabFromPath(location));
+
+  // Sincronizza tab se l'URL cambia (es. tasto indietro del browser)
+  useEffect(() => {
+    setActiveTab(getTabFromPath(location));
+  }, [location]);
+
+  // Quando clicchi nel menu, CAMBIA L'URL
+  const handleTabChange = (tab: Tab) => {
+    switch (tab) {
+      case "new-entry": setLocation("/"); break;
+      case "operations": setLocation("/operations"); break;
+      case "calendario": setLocation("/calendar"); break;
+      case "statistiche": setLocation("/stats"); break;
+      case "diary": setLocation("/diary"); break;
+      case "goals": setLocation("/goals"); break;
+      case "settings": setLocation("/settings"); break;
+      case "admin": setLocation("/admin"); break; // <--- QUESTO RISOLVE IL TUO PROBLEMA
+      default: setLocation("/"); break;
+    }
+  };
+  // ------------------------------------
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
@@ -256,18 +270,17 @@ export default function Dashboard() {
 
   const handleSubmitTrade = (formData: TradeFormData) => {
     if (editingTrade) {
-      updateTradeMutation.mutate({ id: editingTrade.id, data: formData }, { onSuccess: () => { setEditingTrade(null); setActiveTab("operations"); } });
+      updateTradeMutation.mutate({ id: editingTrade.id, data: formData }, { onSuccess: () => { setEditingTrade(null); handleTabChange("operations"); } });
     } else {
-      createTradeMutation.mutate(formData, { onSuccess: () => setActiveTab("operations") });
+      createTradeMutation.mutate(formData, { onSuccess: () => handleTabChange("operations") });
     }
   };
 
-  const handleEditTrade = (trade: Trade) => { setEditingTrade(trade); setIsDetailModalOpen(false); setActiveTab("new-entry"); };
+  const handleEditTrade = (trade: Trade) => { setEditingTrade(trade); setIsDetailModalOpen(false); handleTabChange("new-entry"); };
   const handleCancelEdit = () => setEditingTrade(null);
   const handleRowClick = (trade: Trade) => { setSelectedTrade(trade); setIsDetailModalOpen(true); };
   const handleDeleteTrade = (id: string) => { deleteTradeMutation.mutate(id); if (editingTrade?.id === id) setEditingTrade(null); };
 
-  // Calculate various stats for display
   const resultBreakdownData = useMemo(() => {
     const calc = (res: string) => ({
       total: filteredTrades.filter(t => t.result === res).length,
@@ -284,19 +297,15 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
-        </main>
+        <Header activeTab={activeTab} onTabChange={handleTabChange} />
+        <main className="max-w-7xl mx-auto px-4 py-6"><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div></main>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Header activeTab={activeTab} onTabChange={setActiveTab} />
+      <Header activeTab={activeTab} onTabChange={handleTabChange} />
 
       <main className="max-w-7xl mx-auto px-4 py-6">
         {activeTab === "statistiche" && (
@@ -318,22 +327,8 @@ export default function Dashboard() {
 
             <div className="grid lg:grid-cols-3 gap-6">
               <DirectionBreakdown trades={filteredTrades} />
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{stats.winRate}%</div>
-                  <p className="text-sm text-muted-foreground mt-1">{filteredTrades.filter((t) => t.result === "target").length} vincenti su {filteredTrades.length} totali</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Risultato Finale</CardTitle></CardHeader>
-                <CardContent>
-                  <div className={`text-3xl font-bold ${parseFloat(stats.totalEquity) >= initialCapital ? "text-emerald-500" : "text-red-500"}`}>
-                    {parseFloat(stats.totalEquity) >= initialCapital ? "+" : ""}{(parseFloat(stats.totalEquity) - initialCapital).toFixed(2)} EUR
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">Equity totale: {stats.totalEquity} EUR</p>
-                </CardContent>
-              </Card>
+              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{stats.winRate}%</div><p className="text-sm text-muted-foreground mt-1">{filteredTrades.filter((t) => t.result === "target").length} vincenti su {filteredTrades.length} totali</p></CardContent></Card>
+              <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Risultato Finale</CardTitle></CardHeader><CardContent><div className={`text-3xl font-bold ${parseFloat(stats.totalEquity) >= initialCapital ? "text-emerald-500" : "text-red-500"}`}>{parseFloat(stats.totalEquity) >= initialCapital ? "+" : ""}{(parseFloat(stats.totalEquity) - initialCapital).toFixed(2)} EUR</div><p className="text-sm text-muted-foreground mt-1">Equity totale: {stats.totalEquity} EUR</p></CardContent></Card>
             </div>
 
             <div className="grid lg:grid-cols-2 gap-6">
