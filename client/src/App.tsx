@@ -41,10 +41,12 @@ function Router() {
 
   return (
     <Switch>
-      {/* 1. Rotta Admin specifica */}
+      {/* --- ROTTE PRINCIPALI --- */}
+      
+      {/* 1. Admin Dashboard (ha la priorità) */}
       <Route path="/admin" component={AdminDashboard} />
 
-      {/* 2. Rotte della Dashboard Utente */}
+      {/* 2. User Dashboard e relative schede */}
       <Route path="/" component={Dashboard} />
       <Route path="/operations" component={Dashboard} />
       <Route path="/calendar" component={Dashboard} />
