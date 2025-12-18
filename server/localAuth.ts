@@ -30,7 +30,7 @@ export function setupLocalAuth(app: Express) {
     store: new PostgresSessionStore({
       pool,
       tableName: "sessions",
-      createTableIfMissing: false,
+      createTableIfMissing: true,
     }),
     cookie: {
       httpOnly: true,
