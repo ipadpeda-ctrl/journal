@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter"; // Importante
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import Header, { Tab } from "@/components/Header";
@@ -35,6 +35,7 @@ const defaultEmotions = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "
 const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
 const defaultConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
 
+// --- Helpers e Mappers ---
 function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
   return {
     id: t.id.toString(),
@@ -60,18 +61,9 @@ function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
 function exportTradesToCSV(trades: Trade[]) {
   const headers = ["Data", "Ora", "Coppia", "Direzione", "Target", "Stop Loss", "Risultato", "P&L", "Emozione", "Confluenze Pro", "Confluenze Contro", "Note"];
   const rows = trades.map(t => [
-    t.date,
-    t.time,
-    t.pair,
-    t.direction === "long" ? "Long" : "Short",
-    t.target.toFixed(5),
-    t.stopLoss.toFixed(5),
-    t.result,
-    (t.pnl || 0).toFixed(2),
-    t.emotion,
-    t.confluencesPro.join("; "),
-    t.confluencesContro.join("; "),
-    t.notes.replace(/"/g, '""'),
+    t.date, t.time, t.pair, t.direction === "long" ? "Long" : "Short",
+    t.target.toFixed(5), t.stopLoss.toFixed(5), t.result, (t.pnl || 0).toFixed(2),
+    t.emotion, t.confluencesPro.join("; "), t.confluencesContro.join("; "), t.notes.replace(/"/g, '""'),
   ]);
   const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
   const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
@@ -85,7 +77,6 @@ function exportTradesToCSV(trades: Trade[]) {
   URL.revokeObjectURL(url);
 }
 
-// Helpers Calcoli
 function calculateProfitFactor(trades: Trade[]): string {
   const wins = trades.filter((t) => t.result === "target");
   const losses = trades.filter((t) => t.result === "stop_loss");
@@ -106,11 +97,7 @@ function calculateEquity(trades: Trade[], initialCapital: number = 10000): strin
 }
 
 function calculateEquityCurve(trades: Trade[], initialCapital: number = 10000) {
-  const sortedTrades = [...trades].sort((a, b) => {
-    const dateA = new Date(`${a.date}T${a.time}`);
-    const dateB = new Date(`${b.date}T${b.time}`);
-    return dateA.getTime() - dateB.getTime();
-  });
+  const sortedTrades = [...trades].sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
   let equity = initialCapital;
   const curve = [{ date: "Start", equity }];
   for (const trade of sortedTrades) {
@@ -184,7 +171,7 @@ export default function Dashboard() {
   const initialCapital = user?.initialCapital ?? 10000;
   const [location, setLocation] = useLocation();
 
-  // --- LOGICA DI NAVIGAZIONE E URL ---
+  // --- LOGICA DI NAVIGAZIONE PULITA ---
   const getTabFromPath = (path: string): Tab => {
     if (path === "/operations") return "operations";
     if (path === "/calendar") return "calendario";
@@ -197,22 +184,19 @@ export default function Dashboard() {
 
   const [activeTab, setActiveTab] = useState<Tab>(() => getTabFromPath(location));
 
-  // Sincronizza tab se l'URL cambia (es. tasto indietro del browser)
   useEffect(() => {
     setActiveTab(getTabFromPath(location));
   }, [location]);
 
-  // Quando clicchi nel menu, CAMBIA L'URL
   const handleTabChange = (tab: Tab) => {
     switch (tab) {
-      case "new-entry": setLocation("/"); break;
+      case "admin": setLocation("/admin"); break; // <-- PUNTO CRUCIALE: Se admin, vai su /admin
       case "operations": setLocation("/operations"); break;
       case "calendario": setLocation("/calendar"); break;
       case "statistiche": setLocation("/stats"); break;
       case "diary": setLocation("/diary"); break;
       case "goals": setLocation("/goals"); break;
       case "settings": setLocation("/settings"); break;
-      case "admin": setLocation("/admin"); break; // <--- QUESTO RISOLVE IL TUO PROBLEMA
       default: setLocation("/"); break;
     }
   };
@@ -298,7 +282,11 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-background">
         <Header activeTab={activeTab} onTabChange={handleTabChange} />
-        <main className="max-w-7xl mx-auto px-4 py-6"><div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div></main>
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        </main>
       </div>
     );
   }

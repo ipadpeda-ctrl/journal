@@ -7,21 +7,8 @@ import Header, { Tab } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
@@ -55,21 +42,20 @@ export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const [location, setLocation] = useLocation();
 
-  // --- NAVIGAZIONE AGGIORNATA ---
+  // --- NAVIGAZIONE CORRETTA VERSO I NUOVI URL ---
   const handleTabChange = (tab: Tab) => {
     switch (tab) {
+      case "admin": break; // Siamo già qui
       case "operations": setLocation("/operations"); break;
-      case "new-entry": setLocation("/"); break;
       case "calendario": setLocation("/calendar"); break;
       case "statistiche": setLocation("/stats"); break;
       case "diary": setLocation("/diary"); break;
       case "goals": setLocation("/goals"); break;
       case "settings": setLocation("/settings"); break;
-      case "admin": break; // Siamo già qui
-      default: console.warn("Tab non gestito:", tab); break;
+      default: setLocation("/"); break; // Home/Nuova operazione
     }
   };
-  // -----------------------------
+  // ---------------------------------------------
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
