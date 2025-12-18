@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter"; // <--- Importante per la navigazione
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import Header, { Tab } from "@/components/Header";
@@ -74,40 +74,43 @@ interface AdminTrade extends Trade {
 export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   
-  // --- NUOVA LOGICA DI NAVIGAZIONE ---
+  // --- NAVIGAZIONE CORRETTA ---
   const [location, setLocation] = useLocation();
 
   const handleTabChange = (tab: Tab) => {
-    // Mappa i tab agli URL corretti del tuo sito
+    // Ora i case corrispondono ESATTAMENTE agli ID nel tuo Header.tsx
     switch (tab) {
-      case "dashboard":
+      case "operations":   // Era "dashboard"
         setLocation("/");
         break;
-      case "journal": 
-        setLocation("/journal"); // Verifica se il tuo URL è /journal o /diary
+      case "new-entry":    // Se cliccano "Nuova op", li mandiamo alla home dove c'è il form
+        setLocation("/");
         break;
-      case "calendar":
+      case "calendario":   // Era "calendar"
         setLocation("/calendar");
         break;
-      case "goals":
+      case "statistiche":  // Era "stats" o simile
+        setLocation("/stats"); // Verifica se la tua rotta è /stats o /statistics
+        break;
+      case "diary":        // Questo era già ok
+        setLocation("/diary");
+        break;
+      case "goals":        // Questo era già ok
         setLocation("/goals");
         break;
-      case "settings":
+      case "settings":     // Questo era già ok
         setLocation("/settings");
         break;
       case "admin":
-        // Siamo già qui
+        // Sei già qui, non fare nulla
         break;
       default:
-        console.warn("Tab sconosciuto:", tab);
+        console.warn("Tab non gestito:", tab);
         break;
     }
   };
-  // -----------------------------------
+  // ---------------------------
 
-  // Nota: activeTab qui è "admin" perché siamo nella pagina admin.
-  // Quando clicchi su altro, handleTabChange ti porterà via da questa pagina.
-  
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<User[]>({
@@ -272,7 +275,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* HEADER CON NAVIGAZIONE CORRETTA */}
       <Header activeTab="admin" onTabChange={handleTabChange} />
 
       <ErrorBoundary>
