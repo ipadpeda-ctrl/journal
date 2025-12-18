@@ -134,6 +134,11 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // FIX: Validazione per impedire trade senza coppia
+    if (!formData.pair || formData.pair.trim() === "") {
+      alert("Seleziona una coppia prima di salvare.");
+      return;
+    }
     onSubmit?.(formData);
     console.log("Trade submitted:", formData);
   };
