@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
 import type { User, Trade } from "@shared/schema";
 
@@ -38,14 +38,27 @@ export default function AdminDashboard() {
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
-  const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<User[]>({
+  // Gestione query con valori di default sicuri
+  const { 
+    data: users = [], 
+    isLoading: usersLoading, 
+    error: usersError,
+    isError: isUsersError
+  } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
     enabled: isAdmin,
+    retry: 1
   });
 
-  const { data: trades = [], isLoading: tradesLoading, error: tradesError } = useQuery<AdminTrade[]>({
+  const { 
+    data: trades = [], 
+    isLoading: tradesLoading, 
+    error: tradesError,
+    isError: isTradesError
+  } = useQuery<AdminTrade[]>({
     queryKey: ["/api/admin/trades"],
     enabled: isAdmin,
+    retry: 1
   });
 
   const updateRoleMutation = useMutation({
@@ -67,15 +80,17 @@ export default function AdminDashboard() {
   });
 
   const isSuperAdmin = user?.role === "super_admin";
-  const isLoading = authLoading || usersLoading || tradesLoading;
+  const isLoading = authLoading || (isAdmin && (usersLoading || tradesLoading));
 
-  if (authLoading) {
+  // 1. PRIMA i controlli di caricamento e permessi
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center justify-center h-64 gap-4">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground">Caricamento dashboard...</p>
           </div>
         </main>
       </div>
@@ -87,9 +102,9 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-background">
         <Header activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="max-w-7xl mx-auto px-4 py-6">
-          <Card className="p-8 text-center">
-            <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-xl font-bold mb-2">Accesso Negato</h2>
+          <Card className="p-8 text-center border-red-200 bg-red-50 dark:bg-red-900/10">
+            <Shield className="w-12 h-12 mx-auto mb-4 text-red-500" />
+            <h2 className="text-xl font-bold mb-2 text-red-700 dark:text-red-400">Accesso Negato</h2>
             <p className="text-muted-foreground">Non hai i permessi per accedere a questa pagina.</p>
           </Card>
         </main>
@@ -97,7 +112,34 @@ export default function AdminDashboard() {
     );
   }
 
+  // Gestione errori API
+  if (isUsersError || isTradesError) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header activeTab={activeTab} onTabChange={setActiveTab} />
+        <main className="max-w-7xl mx-auto px-4 py-6">
+          <Card className="p-8 text-center border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+            <h2 className="text-xl font-bold mb-2 text-yellow-700 dark:text-yellow-400">Errore Caricamento Dati</h2>
+            <p className="text-muted-foreground mb-4">
+              Impossibile recuperare i dati utenti o trades. Potrebbe essere un problema di permessi server.
+            </p>
+            <div className="text-xs text-left bg-black/5 p-4 rounded overflow-auto max-h-40">
+              {usersError && <p>Users Error: {usersError.message}</p>}
+              {tradesError && <p>Trades Error: {tradesError.message}</p>}
+            </div>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  // 2. POI i calcoli (ora siamo sicuri che i dati ci sono e non stiamo caricando)
+  
+  // Helper sicuro per ottenere le statistiche
   const getUserStats = (userId: string) => {
+    if (!Array.isArray(trades)) return { totalTrades: 0, wins: 0, losses: 0, winRate: 0, pnl: 0 };
+    
     const userTrades = trades.filter((t) => t.userId === userId);
     const wins = userTrades.filter((t) => t.result === "target").length;
     const losses = userTrades.filter((t) => t.result === "stop_loss").length;
@@ -106,19 +148,21 @@ export default function AdminDashboard() {
     return { totalTrades: userTrades.length, wins, losses, winRate, pnl };
   };
 
-  const leaderboardByWinRate = users
+  const safeUsers = Array.isArray(users) ? users : [];
+
+  const leaderboardByWinRate = safeUsers
     .map((u) => ({ ...u, stats: getUserStats(u.id) }))
     .filter((u) => u.stats.totalTrades >= 1)
     .sort((a, b) => b.stats.winRate - a.stats.winRate)
     .slice(0, 10);
 
-  const leaderboardByPnL = users
+  const leaderboardByPnL = safeUsers
     .map((u) => ({ ...u, stats: getUserStats(u.id) }))
     .filter((u) => u.stats.totalTrades >= 1)
     .sort((a, b) => b.stats.pnl - a.stats.pnl)
     .slice(0, 10);
 
-  const userTradesChartData = users
+  const userTradesChartData = safeUsers
     .map((u) => ({
       name: u.firstName || u.email?.split("@")[0] || "?",
       trades: getUserStats(u.id).totalTrades,
@@ -136,13 +180,13 @@ export default function AdminDashboard() {
   };
 
   const totalStats = {
-    totalUsers: users.length,
-    totalTrades: trades.length,
-    avgWinRate: users.length > 0
-      ? users.reduce((sum, u) => sum + getUserStats(u.id).winRate, 0) / users.length
+    totalUsers: safeUsers.length,
+    totalTrades: Array.isArray(trades) ? trades.length : 0,
+    avgWinRate: safeUsers.length > 0
+      ? safeUsers.reduce((sum, u) => sum + getUserStats(u.id).winRate, 0) / safeUsers.length
       : 0,
-    totalWins: trades.filter((t) => t.result === "target").length,
-    totalLosses: trades.filter((t) => t.result === "stop_loss").length,
+    totalWins: Array.isArray(trades) ? trades.filter((t) => t.result === "target").length : 0,
+    totalLosses: Array.isArray(trades) ? trades.filter((t) => t.result === "stop_loss").length : 0,
   };
 
   const getRoleBadge = (role: string) => {
@@ -167,7 +211,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const pendingUsers = users.filter(u => u.isApproved === "pending");
+  const pendingUsers = safeUsers.filter(u => u.isApproved === "pending");
 
   const getResultBadge = (result: string) => {
     switch (result) {
@@ -183,19 +227,6 @@ export default function AdminDashboard() {
         return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Non Fillato</Badge>;
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -318,7 +349,7 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u) => {
+                    {safeUsers.map((u) => {
                       const stats = getUserStats(u.id);
                       return (
                         <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
@@ -409,7 +440,7 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {trades.length === 0 ? (
+                      {(!Array.isArray(trades) || trades.length === 0) ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                             Nessuna operazione trovata
@@ -417,7 +448,7 @@ export default function AdminDashboard() {
                         </TableRow>
                       ) : (
                         trades.map((trade) => {
-                          const tradeUser = users.find((u) => u.id === trade.userId);
+                          const tradeUser = safeUsers.find((u) => u.id === trade.userId);
                           return (
                             <TableRow key={trade.id} data-testid={`row-admin-trade-${trade.id}`}>
                               <TableCell>
