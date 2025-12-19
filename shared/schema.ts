@@ -1,9 +1,20 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, varchar, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  index,
+  jsonb,
+  pgTable,
+  timestamp,
+  varchar,
+  serial,
+  text,
+  integer,
+  real,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { sql } from "drizzle-orm";
 
 // Session storage table.
+// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessions = pgTable(
   "sessions",
   {
@@ -11,7 +22,7 @@ export const sessions = pgTable(
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
   },
-  (table) => []
+  (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
 // User storage table with roles and authentication
@@ -22,12 +33,9 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").notNull().default("user"),
-  isApproved: varchar("is_approved").notNull().default("pending"),
-  // FIX: Usiamo decimal per precisione finanziaria
-  initialCapital: decimal("initial_capital", { precision: 12, scale: 2 }).default("10000.00"),
-  // FIX: Colonna per salvare le preferenze (coppie, emozioni, ecc.)
-  preferences: jsonb("preferences").$type<{ pairs: string[]; emotions: string[] }>().default({ pairs: [], emotions: [] }),
+  role: varchar("role").notNull().default("user"), // super_admin, admin, user
+  isApproved: varchar("is_approved").notNull().default("pending"), // pending, approved, rejected
+  initialCapital: real("initial_capital").default(10000),
   resetToken: varchar("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -37,6 +45,7 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// Registration schema for new users
 export const registerUserSchema = z.object({
   email: z.string().email("Email non valida"),
   password: z.string().min(6, "La password deve avere almeno 6 caratteri"),
@@ -46,6 +55,7 @@ export const registerUserSchema = z.object({
 
 export type RegisterUser = z.infer<typeof registerUserSchema>;
 
+// Login schema
 export const loginUserSchema = z.object({
   email: z.string().email("Email non valida"),
   password: z.string().min(1, "Password richiesta"),
@@ -57,21 +67,17 @@ export type LoginUser = z.infer<typeof loginUserSchema>;
 export const trades = pgTable("trades", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
-  date: varchar("date").notNull(), // Entry Date
-  time: varchar("time"), // Entry Time
-  // FIX: Holding Time fields
-  exitDate: varchar("exit_date"), 
-  exitTime: varchar("exit_time"),
+  date: varchar("date").notNull(),
+  time: varchar("time"),
   pair: varchar("pair").notNull(),
-  direction: varchar("direction").notNull(),
-  // FIX: Numeri precisi
-  target: decimal("target", { precision: 10, scale: 5 }),
-  stopLoss: decimal("stop_loss", { precision: 10, scale: 5 }),
-  slPips: decimal("sl_pips", { precision: 10, scale: 1 }),
-  tpPips: decimal("tp_pips", { precision: 10, scale: 1 }),
-  rr: decimal("rr", { precision: 10, scale: 2 }),
-  result: varchar("result").notNull(),
-  pnl: decimal("pnl", { precision: 12, scale: 2 }),
+  direction: varchar("direction").notNull(), // long, short
+  target: real("target"),
+  stopLoss: real("stop_loss"),
+  slPips: real("sl_pips"), // Stop loss in pips
+  tpPips: real("tp_pips"), // Take profit in pips
+  rr: real("rr"), // Risk/Reward ratio
+  result: varchar("result").notNull(), // win, loss, breakeven
+  pnl: real("pnl"),
   emotion: varchar("emotion"),
   confluencesPro: text("confluences_pro").array(),
   confluencesContro: text("confluences_contro").array(),
@@ -88,6 +94,7 @@ export const insertTradeSchema = createInsertSchema(trades).omit({
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type Trade = typeof trades.$inferSelect;
 
+// Trading diary for daily notes
 export const tradingDiary = pgTable("trading_diary", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -105,14 +112,15 @@ export const insertDiarySchema = createInsertSchema(tradingDiary).omit({
 export type InsertDiary = z.infer<typeof insertDiarySchema>;
 export type TradingDiary = typeof tradingDiary.$inferSelect;
 
+// Monthly goals
 export const goals = pgTable("goals", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
   month: integer("month").notNull(),
   year: integer("year").notNull(),
   targetTrades: integer("target_trades"),
-  targetWinRate: decimal("target_win_rate", { precision: 5, scale: 2 }),
-  targetProfit: decimal("target_profit", { precision: 12, scale: 2 }),
+  targetWinRate: real("target_win_rate"),
+  targetProfit: real("target_profit"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
