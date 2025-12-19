@@ -4,7 +4,6 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import Header, { Tab } from "@/components/Header";
-import StatCard from "@/components/StatCard";
 import TradeForm, { TradeFormData } from "@/components/TradeForm";
 import TradesTable, { Trade } from "@/components/TradesTable";
 import TradeDetailModal from "@/components/TradeDetailModal";
@@ -30,10 +29,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Trade as SchemaTrade } from "@shared/schema";
 
-const defaultPairs = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
-const defaultEmotions = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
-const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
-const defaultConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
+// Fallback defaults if DB is empty
+const FALLBACK_PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
+const FALLBACK_EMOTIONS = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
 
 // --- Helpers e Mappers ---
 function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
@@ -41,15 +39,18 @@ function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
     id: t.id.toString(),
     date: t.date,
     time: t.time || "",
+    exitDate: t.exitDate || undefined, // NEW: Mapped
+    exitTime: t.exitTime || undefined, // NEW: Mapped
     pair: t.pair,
     direction: t.direction as "long" | "short",
-    target: t.target || 0,
-    stopLoss: t.stopLoss || 0,
-    slPips: t.slPips || undefined,
-    tpPips: t.tpPips || undefined,
-    rr: t.rr || undefined,
+    // FIX: Convert decimal strings to numbers for frontend math
+    target: t.target ? parseFloat(t.target.toString()) : 0,
+    stopLoss: t.stopLoss ? parseFloat(t.stopLoss.toString()) : 0,
+    slPips: t.slPips ? parseFloat(t.slPips.toString()) : undefined,
+    tpPips: t.tpPips ? parseFloat(t.tpPips.toString()) : undefined,
+    rr: t.rr ? parseFloat(t.rr.toString()) : undefined,
     result: t.result as Trade["result"],
-    pnl: t.pnl || 0,
+    pnl: t.pnl ? parseFloat(t.pnl.toString()) : 0, // IMPORTANT: Use PnL from DB
     emotion: t.emotion || "",
     confluencesPro: t.confluencesPro || [],
     confluencesContro: t.confluencesContro || [],
@@ -58,120 +59,43 @@ function mapSchemaTradeToTrade(t: SchemaTrade): Trade {
   };
 }
 
-function exportTradesToCSV(trades: Trade[]) {
-  const headers = ["Data", "Ora", "Coppia", "Direzione", "Target", "Stop Loss", "Risultato", "P&L", "Emozione", "Confluenze Pro", "Confluenze Contro", "Note"];
-  const rows = trades.map(t => [
-    t.date, t.time, t.pair, t.direction === "long" ? "Long" : "Short",
-    t.target.toFixed(5), t.stopLoss.toFixed(5), t.result, (t.pnl || 0).toFixed(2),
-    t.emotion, t.confluencesPro.join("; "), t.confluencesContro.join("; "), t.notes.replace(/"/g, '""'),
-  ]);
-  const csvContent = [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
-  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `trades_export_${new Date().toISOString().split("T")[0]}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+function calculateEquity(trades: Trade[], initialCapital: number): string {
+  // FIX: Logic corrected to use Actual PnL
+  const totalPnL = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  return (initialCapital + totalPnL).toFixed(2);
 }
 
-function calculateProfitFactor(trades: Trade[]): string {
-  const wins = trades.filter((t) => t.result === "target");
-  const losses = trades.filter((t) => t.result === "stop_loss");
-  const totalWins = wins.reduce((sum, t) => sum + t.target, 0);
-  const totalLosses = losses.reduce((sum, t) => sum + t.stopLoss, 0);
-  if (totalLosses === 0) return totalWins > 0 ? "∞" : "0.00";
-  return (totalWins / totalLosses).toFixed(2);
-}
-
-function calculateEquity(trades: Trade[], initialCapital: number = 10000): string {
-  let equity = initialCapital;
-  for (const trade of trades) {
-    if (trade.result === "target") equity += trade.target * 100;
-    else if (trade.result === "stop_loss") equity -= trade.stopLoss * 100;
-    else if (trade.result === "parziale") equity += (trade.target * 0.5) * 100;
-  }
-  return equity.toFixed(2);
-}
-
-function calculateEquityCurve(trades: Trade[], initialCapital: number = 10000) {
-  const sortedTrades = [...trades].sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
+function calculateEquityCurve(trades: Trade[], initialCapital: number) {
+  const sortedTrades = [...trades].sort((a, b) => {
+    const timeA = a.time || "00:00";
+    const timeB = b.time || "00:00";
+    return new Date(`${a.date}T${timeA}`).getTime() - new Date(`${b.date}T${timeB}`).getTime();
+  });
+  
   let equity = initialCapital;
   const curve = [{ date: "Start", equity }];
+  
   for (const trade of sortedTrades) {
-    if (trade.result === "target") equity += trade.target * 100;
-    else if (trade.result === "stop_loss") equity -= trade.stopLoss * 100;
-    else if (trade.result === "parziale") equity += (trade.target * 0.5) * 100;
+    // FIX: Using PnL exclusively for equity curve
+    equity += (trade.pnl || 0);
     curve.push({ date: trade.date.slice(5), equity });
   }
   return curve;
 }
 
-function calculateMetrics(trades: Trade[]) {
-  const wins = trades.filter((t) => t.result === "target");
-  const losses = trades.filter((t) => t.result === "stop_loss");
-  const partials = trades.filter((t) => t.result === "parziale");
-  const totalWins = wins.reduce((sum, t) => sum + t.target, 0);
-  const totalLosses = losses.reduce((sum, t) => sum + t.stopLoss, 0);
-  const totalPartials = partials.reduce((sum, t) => sum + t.target * 0.5, 0);
-  const profitFactor = totalLosses > 0 ? (totalWins + totalPartials) / totalLosses : 0;
-  const avgWin = wins.length > 0 ? totalWins / wins.length : 0;
-  const avgLoss = losses.length > 0 ? totalLosses / losses.length : 0;
-  const riskReward = avgLoss > 0 ? avgWin / avgLoss : 0;
-  const winRate = trades.length > 0 ? (wins.length + partials.length * 0.5) / trades.length : 0;
-  const expectancy = (winRate * avgWin) - ((1 - winRate) * avgLoss);
-  return { profitFactor: profitFactor.toFixed(2), riskReward: riskReward.toFixed(2), expectancy: expectancy.toFixed(2), avgLoss: avgLoss.toFixed(2) };
-}
-
-function calculateMoodData(trades: Trade[]) {
-  const allEmotions = ["FOMO", "Rabbia", "Neutrale", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
-  return allEmotions.map((emotion) => {
-    const emotionTrades = trades.filter((t) => t.emotion === emotion);
-    const count = emotionTrades.length;
-    const wins = emotionTrades.filter((t) => t.result === "target").length;
-    const winRate = count > 0 ? (wins / count) * 100 : 0;
-    return { emotion, count, winRate };
-  });
-}
-
-function calculateConfluenceStats(trades: Trade[]) {
-  const allPro = defaultConfluencesPro;
-  const allContro = defaultConfluencesContro;
-  const calcStats = (items: string[], type: 'pro' | 'contro') => items.map(conf => {
-    const confTrades = trades.filter(t => type === 'pro' ? t.confluencesPro.includes(conf) : t.confluencesContro.includes(conf));
-    const count = confTrades.length;
-    const wins = confTrades.filter(t => t.result === "target").length;
-    const losses = confTrades.filter(t => t.result === "stop_loss").length;
-    const winRate = count > 0 ? (wins / count) * 100 : 0;
-    return { name: conf, count, wins, losses, winRate };
-  });
-  return { confluencesPro: calcStats(allPro, 'pro'), confluencesContro: calcStats(allContro, 'contro') };
-}
-
-function calculatePerformanceByPair(trades: Trade[]) {
-  const pairs = Array.from(new Set(trades.map((t) => t.pair)));
-  return pairs.map((pair) => {
-    const pairTrades = trades.filter((t) => t.pair === pair);
-    const wins = pairTrades.filter((t) => t.result === "target").length;
-    const losses = pairTrades.filter((t) => t.result === "stop_loss").length;
-    const pnl = pairTrades.reduce((sum, t) => {
-      if (t.result === "target") return sum + t.target;
-      if (t.result === "stop_loss") return sum - t.stopLoss;
-      if (t.result === "parziale") return sum + t.target * 0.5;
-      return sum;
-    }, 0);
-    return { pair, trades: pairTrades.length, wins, losses, pnl: pnl * 100 };
-  });
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
-  const initialCapital = user?.initialCapital ?? 10000;
+  
+  // FIX: Fetch precision decimal as number, handle fallback
+  const initialCapital = user?.initialCapital ? parseFloat(user.initialCapital.toString()) : 10000;
+  
+  // FIX: Load preferences from User object
+  const userPreferences = user?.preferences as { pairs?: string[], emotions?: string[] } | undefined;
+  const activePairs = userPreferences?.pairs?.length ? userPreferences.pairs : FALLBACK_PAIRS;
+  const activeEmotions = userPreferences?.emotions?.length ? userPreferences.emotions : FALLBACK_EMOTIONS;
+
   const [location, setLocation] = useLocation();
 
-  // --- LOGICA DI NAVIGAZIONE PULITA ---
   const getTabFromPath = (path: string): Tab => {
     if (path === "/operations") return "operations";
     if (path === "/calendar") return "calendario";
@@ -190,7 +114,7 @@ export default function Dashboard() {
 
   const handleTabChange = (tab: Tab) => {
     switch (tab) {
-      case "admin": setLocation("/admin"); break; // <-- PUNTO CRUCIALE: Se admin, vai su /admin
+      case "admin": setLocation("/admin"); break;
       case "operations": setLocation("/operations"); break;
       case "calendario": setLocation("/calendar"); break;
       case "statistiche": setLocation("/stats"); break;
@@ -200,7 +124,6 @@ export default function Dashboard() {
       default: setLocation("/"); break;
     }
   };
-  // ------------------------------------
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
@@ -229,12 +152,28 @@ export default function Dashboard() {
   const clearFilters = () => { setFilterStartDate(""); setFilterEndDate(""); };
 
   const createTradeMutation = useMutation({
-    mutationFn: async (data: TradeFormData) => apiRequest("POST", "/api/trades", { ...data, target: parseFloat(data.target), stopLoss: parseFloat(data.stopLoss), slPips: data.slPips ? parseFloat(data.slPips) : null, tpPips: data.tpPips ? parseFloat(data.tpPips) : null, rr: data.rr ? parseFloat(data.rr) : null }),
+    mutationFn: async (data: TradeFormData) => apiRequest("POST", "/api/trades", { 
+      ...data, 
+      target: data.target.toString(), 
+      stopLoss: data.stopLoss.toString(), 
+      slPips: data.slPips?.toString(),
+      tpPips: data.tpPips?.toString(),
+      rr: data.rr?.toString(),
+      pnl: data.pnl?.toString() // Ensure PnL is sent as string for decimal
+    }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trades"] }),
   });
 
   const updateTradeMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: TradeFormData }) => apiRequest("PATCH", `/api/trades/${id}`, { ...data, target: parseFloat(data.target), stopLoss: parseFloat(data.stopLoss), slPips: data.slPips ? parseFloat(data.slPips) : null, tpPips: data.tpPips ? parseFloat(data.tpPips) : null, rr: data.rr ? parseFloat(data.rr) : null }),
+    mutationFn: async ({ id, data }: { id: string; data: TradeFormData }) => apiRequest("PATCH", `/api/trades/${id}`, {
+      ...data,
+      target: data.target.toString(),
+      stopLoss: data.stopLoss.toString(),
+      slPips: data.slPips?.toString(),
+      tpPips: data.tpPips?.toString(),
+      rr: data.rr?.toString(),
+      pnl: data.pnl?.toString()
+    }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trades"] }),
   });
 
@@ -243,10 +182,14 @@ export default function Dashboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/trades"] }),
   });
 
+  const updateUserMutation = useMutation({
+    mutationFn: async (data: { initialCapital?: string, preferences?: any }) => apiRequest("PATCH", "/api/user", data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/user"] }),
+  });
+
   const stats = useMemo(() => ({
     totalOperations: filteredTrades.length,
     winRate: filteredTrades.length > 0 ? ((filteredTrades.filter((t) => t.result === "target").length / filteredTrades.length) * 100).toFixed(1) : "0",
-    profitFactor: calculateProfitFactor(filteredTrades),
     totalEquity: calculateEquity(filteredTrades, initialCapital),
   }), [filteredTrades, initialCapital]);
 
@@ -265,18 +208,15 @@ export default function Dashboard() {
   const handleRowClick = (trade: Trade) => { setSelectedTrade(trade); setIsDetailModalOpen(true); };
   const handleDeleteTrade = (id: string) => { deleteTradeMutation.mutate(id); if (editingTrade?.id === id) setEditingTrade(null); };
 
-  const resultBreakdownData = useMemo(() => {
-    const calc = (res: string) => ({
-      total: filteredTrades.filter(t => t.result === res).length,
-      long: filteredTrades.filter(t => t.result === res && t.direction === "long").length,
-      short: filteredTrades.filter(t => t.result === res && t.direction === "short").length,
+  const handleSaveSettings = (newSettings: { pairs: string[], emotions: string[], initialCapital: number }) => {
+    updateUserMutation.mutate({
+      initialCapital: newSettings.initialCapital.toString(),
+      preferences: {
+        pairs: newSettings.pairs,
+        emotions: newSettings.emotions
+      }
     });
-    return { target: calc("target"), stopLoss: calc("stop_loss"), breakeven: calc("breakeven"), parziale: calc("parziale") };
-  }, [filteredTrades]);
-
-  const moodData = useMemo(() => calculateMoodData(filteredTrades), [filteredTrades]);
-  const { confluencesPro, confluencesContro } = useMemo(() => calculateConfluenceStats(filteredTrades), [filteredTrades]);
-  const performanceByPair = useMemo(() => calculatePerformanceByPair(filteredTrades), [filteredTrades]);
+  };
 
   if (isLoading) {
     return (
@@ -306,10 +246,6 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2"><Label htmlFor="filterEnd" className="text-xs text-muted-foreground">A:</Label><Input id="filterEnd" type="date" value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)} className="h-8 w-36 text-xs" /></div>
                   {isFiltered && <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8"><X className="w-3 h-3 mr-1" />Rimuovi filtri</Button>}
                 </div>
-                <div className="flex items-center gap-2">
-                  {isFiltered && <span className="text-xs text-muted-foreground">Mostrati {filteredTrades.length} di {trades.length} trade</span>}
-                  <Button variant="outline" onClick={() => exportTradesToCSV(filteredTrades)} disabled={filteredTrades.length === 0}><Download className="w-4 h-4 mr-2" />Esporta CSV</Button>
-                </div>
               </div>
             </Card>
 
@@ -325,6 +261,7 @@ export default function Dashboard() {
             </div>
 
             <MetricsCards trades={filteredTrades} />
+            {/* FIX: New Metrics Component with Sharpe/Sortino/Holding */}
             <AdvancedMetrics trades={filteredTrades} />
             <MonthlyComparison trades={filteredTrades} initialCapital={initialCapital} />
 
@@ -366,10 +303,37 @@ export default function Dashboard() {
         )}
 
         {activeTab === "new-entry" && (
-          <TradeForm onSubmit={handleSubmitTrade} onDuplicate={() => console.log("Duplicate")} editingTrade={editingTrade ? { ...editingTrade, target: editingTrade.target.toString(), stopLoss: editingTrade.stopLoss.toString(), slPips: editingTrade.slPips?.toString() || "", tpPips: editingTrade.tpPips?.toString() || "", rr: editingTrade.rr?.toString() || "" } : undefined} onCancelEdit={handleCancelEdit} />
+          // FIX: Pass active pairs/emotions to form
+          <TradeForm 
+            availablePairs={activePairs}
+            availableEmotions={activeEmotions}
+            onSubmit={handleSubmitTrade} 
+            onDuplicate={() => console.log("Duplicate")} 
+            editingTrade={editingTrade ? { 
+              ...editingTrade, 
+              target: editingTrade.target.toString(), 
+              stopLoss: editingTrade.stopLoss.toString(), 
+              slPips: editingTrade.slPips?.toString() || "", 
+              tpPips: editingTrade.tpPips?.toString() || "", 
+              rr: editingTrade.rr?.toString() || "",
+              pnl: editingTrade.pnl?.toString() || ""
+            } : undefined} 
+            onCancelEdit={handleCancelEdit} 
+          />
         )}
 
-        {activeTab === "settings" && <Settings pairs={defaultPairs} emotions={defaultEmotions} confluencesPro={defaultConfluencesPro} confluencesContro={defaultConfluencesContro} initialCapital={initialCapital} onSave={(settings) => console.log("Settings saved:", settings)} />}
+        {/* FIX: Settings logic linked to update mutation */}
+        {activeTab === "settings" && (
+          <Settings 
+            pairs={activePairs} 
+            emotions={activeEmotions} 
+            confluencesPro={[]} // Se vuoi renderle editabili, segui lo stesso pattern di pairs
+            confluencesContro={[]} 
+            initialCapital={initialCapital} 
+            onSave={handleSaveSettings} 
+          />
+        )}
+        
         {activeTab === "diary" && <TradingDiary />}
         {activeTab === "goals" && <MonthlyGoals trades={trades.map((t) => ({ date: t.date, result: t.result, target: t.target, stopLoss: t.stopLoss }))} />}
       </main>
