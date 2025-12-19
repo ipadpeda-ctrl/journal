@@ -1,572 +1,245 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Plus, X, Copy, ImageIcon, Trash2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ConfluenceTag from "./ConfluenceTag";
+import { Plus, Save, Copy, X } from "lucide-react";
+import { useState, useEffect } from "react";
 
-const PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
-const EMOTIONS = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
+const tradeSchema = z.object({
+  date: z.string().min(1, "Data richiesta"),
+  time: z.string().optional(),
+  // NEW: Exit fields
+  exitDate: z.string().optional(),
+  exitTime: z.string().optional(),
+  pair: z.string().min(1, "Coppia richiesta"),
+  direction: z.enum(["long", "short"]),
+  target: z.string().min(1, "Target richiesto"),
+  stopLoss: z.string().min(1, "Stop loss richiesto"),
+  slPips: z.string().optional(),
+  tpPips: z.string().optional(),
+  rr: z.string().optional(),
+  result: z.enum(["target", "stop_loss", "breakeven", "parziale", "non_fillato"]),
+  pnl: z.string().optional(), // Now crucial
+  emotion: z.string().optional(),
+  confluencesPro: z.array(z.string()).default([]),
+  confluencesContro: z.array(z.string()).default([]),
+  imageUrls: z.array(z.string()).default([]),
+  notes: z.string().optional(),
+});
+
+export type TradeFormData = z.infer<typeof tradeSchema>;
 
 interface TradeFormProps {
-  onSubmit?: (trade: TradeFormData) => void;
-  onDuplicate?: () => void;
-  editingTrade?: TradeFormData & { id?: string };
+  onSubmit: (data: TradeFormData) => void;
+  onDuplicate: (data: TradeFormData) => void;
+  editingTrade?: TradeFormData & { id: string };
   onCancelEdit?: () => void;
+  // FIX: Dynamic lists from props
+  availablePairs: string[];
+  availableEmotions: string[];
 }
 
-export type TradeResult = "target" | "stop_loss" | "breakeven" | "parziale" | "non_fillato";
-
-export interface TradeFormData {
-  date: string;
-  time: string;
-  pair: string;
-  direction: "long" | "short";
-  target: string;
-  stopLoss: string;
-  slPips: string;
-  tpPips: string;
-  rr: string;
-  result: TradeResult;
-  emotion: string;
-  confluencesPro: string[];
-  confluencesContro: string[];
-  imageUrls: string[];
-  notes: string;
-}
-
-const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
-const defaultConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
-
-export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCancelEdit }: TradeFormProps) {
-  const getInitialFormData = (): TradeFormData => {
-    if (editingTrade) {
-      return {
-        date: editingTrade.date,
-        time: editingTrade.time,
-        pair: editingTrade.pair,
-        direction: editingTrade.direction,
-        target: editingTrade.target,
-        stopLoss: editingTrade.stopLoss,
-        slPips: editingTrade.slPips || "",
-        tpPips: editingTrade.tpPips || "",
-        rr: editingTrade.rr || "",
-        result: editingTrade.result,
-        emotion: editingTrade.emotion,
-        confluencesPro: editingTrade.confluencesPro,
-        confluencesContro: editingTrade.confluencesContro,
-        imageUrls: editingTrade.imageUrls,
-        notes: editingTrade.notes,
-      };
-    }
-    return {
+export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCancelEdit, availablePairs, availableEmotions }: TradeFormProps) {
+  const form = useForm<TradeFormData>({
+    resolver: zodResolver(tradeSchema),
+    defaultValues: editingTrade || {
       date: new Date().toISOString().split("T")[0],
-      time: new Date().toTimeString().slice(0, 5),
+      time: new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }),
+      exitDate: "",
+      exitTime: "",
       pair: "",
       direction: "long",
       target: "",
-      stopLoss: "1.00", // Default Risk
+      stopLoss: "",
       slPips: "",
       tpPips: "",
       rr: "",
-      result: "target",
-      emotion: "Neutrale",
+      result: "non_fillato",
+      pnl: "",
+      emotion: "",
       confluencesPro: [],
       confluencesContro: [],
       imageUrls: [],
       notes: "",
-    };
-  };
+    },
+  });
 
-  const [formData, setFormData] = useState<TradeFormData>(getInitialFormData);
+  const [activeTab, setActiveTab] = useState("generale");
+  const [confluenceProInput, setConfluenceProInput] = useState("");
+  const [confluenceControInput, setConfluenceControInput] = useState("");
+  const [imageUrlInput, setImageUrlInput] = useState("");
 
   useEffect(() => {
-    setFormData(getInitialFormData());
-  }, [editingTrade?.id]);
-
-  // Calcola RR matematico puro (TP pips / SL pips)
-  const calculateRR = (sl: string, tp: string): number => {
-    const slVal = parseFloat(sl);
-    const tpVal = parseFloat(tp);
-    if (slVal > 0 && tpVal > 0) {
-      return tpVal / slVal;
+    if (editingTrade) {
+      form.reset(editingTrade);
     }
-    return 0;
-  };
+  }, [editingTrade, form]);
 
-  // Aggiorna SL Pips e ricalcola Target basandosi sul Rischio attuale
-  const handleSlPipsChange = (value: string) => {
-    const rrValue = calculateRR(value, formData.tpPips);
-    const riskValue = parseFloat(formData.stopLoss) || 0;
-    
-    // Target = RR * Rischio
-    const newTarget = rrValue > 0 && riskValue > 0 ? (rrValue * riskValue).toFixed(2) : formData.target;
-
-    setFormData((prev) => ({ 
-      ...prev, 
-      slPips: value, 
-      rr: rrValue > 0 ? rrValue.toFixed(2) : "",
-      target: newTarget
-    }));
-  };
-
-  // Aggiorna TP Pips e ricalcola Target basandosi sul Rischio attuale
-  const handleTpPipsChange = (value: string) => {
-    const rrValue = calculateRR(formData.slPips, value);
-    const riskValue = parseFloat(formData.stopLoss) || 0;
-
-    const newTarget = rrValue > 0 && riskValue > 0 ? (rrValue * riskValue).toFixed(2) : formData.target;
-
-    setFormData((prev) => ({ 
-      ...prev, 
-      tpPips: value, 
-      rr: rrValue > 0 ? rrValue.toFixed(2) : "",
-      target: newTarget
-    }));
-  };
-
-  // Gestisce il cambio manuale del Rischio (Stop Loss R)
-  // Ricalcola il Target mantenendo costante l'RR dei pips
-  const handleRiskChange = (value: string) => {
-    const riskValue = parseFloat(value);
-    const rrValue = parseFloat(formData.rr);
-
-    let newTarget = formData.target;
-    if (!isNaN(riskValue) && !isNaN(rrValue) && rrValue > 0) {
-      newTarget = (rrValue * riskValue).toFixed(2);
-    }
-
-    setFormData((prev) => ({ ...prev, stopLoss: value, target: newTarget }));
-  };
-
-  const [newProTag, setNewProTag] = useState("");
-  const [newControTag, setNewControTag] = useState("");
-  const [newImageUrl, setNewImageUrl] = useState("");
-
-  const addImageUrl = (url: string) => {
-    if (!url.trim()) return;
-    if (!formData.imageUrls.includes(url)) {
-      setFormData((prev) => ({ ...prev, imageUrls: [...prev.imageUrls, url] }));
-    }
-    setNewImageUrl("");
-  };
-
-  const removeImageUrl = (url: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      imageUrls: prev.imageUrls.filter((u) => u !== url),
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.pair || formData.pair.trim() === "") {
-      alert("Seleziona una coppia prima di salvare.");
-      return;
-    }
-    onSubmit?.(formData);
-  };
-
-  const addConfluence = (type: "pro" | "contro", value: string) => {
+  const addConfluence = (type: "pro" | "contro") => {
+    const value = type === "pro" ? confluenceProInput : confluenceControInput;
     if (!value.trim()) return;
-    const key = type === "pro" ? "confluencesPro" : "confluencesContro";
-    if (!formData[key].includes(value)) {
-      setFormData((prev) => ({ ...prev, [key]: [...prev[key], value] }));
-    }
-    if (type === "pro") setNewProTag("");
-    else setNewControTag("");
+    const field = type === "pro" ? "confluencesPro" : "confluencesContro";
+    const current = form.getValues(field);
+    form.setValue(field, [...current, value.trim()]);
+    if (type === "pro") setConfluenceProInput(""); else setConfluenceControInput("");
   };
 
-  const removeConfluence = (type: "pro" | "contro", value: string) => {
-    const key = type === "pro" ? "confluencesPro" : "confluencesContro";
-    setFormData((prev) => ({
-      ...prev,
-      [key]: prev[key].filter((c) => c !== value),
-    }));
+  const removeConfluence = (type: "pro" | "contro", index: number) => {
+    const field = type === "pro" ? "confluencesPro" : "confluencesContro";
+    const current = form.getValues(field);
+    form.setValue(field, current.filter((_, i) => i !== index));
+  };
+
+  const addImage = () => {
+    if (!imageUrlInput.trim()) return;
+    const current = form.getValues("imageUrls");
+    form.setValue("imageUrls", [...current, imageUrlInput.trim()]);
+    setImageUrlInput("");
   };
 
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <h2 className="text-lg font-medium">{editingTrade ? "Modifica Operazione" : "Nuova Operazione"}</h2>
-          {!editingTrade && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onDuplicate}
-              data-testid="button-duplicate-trade"
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              Duplica Ultima
-            </Button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="date">Data</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-              data-testid="input-date"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="time">Ora</Label>
-            <Input
-              id="time"
-              type="time"
-              value={formData.time}
-              onChange={(e) => setFormData((prev) => ({ ...prev, time: e.target.value }))}
-              data-testid="input-time"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="pair">Coppia</Label>
-            <Select
-              value={formData.pair}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, pair: value }))}
-            >
-              <SelectTrigger id="pair" data-testid="select-pair">
-                <SelectValue placeholder="Seleziona" />
-              </SelectTrigger>
-              <SelectContent>
-                {PAIRS.map((pair) => (
-                  <SelectItem key={pair} value={pair}>
-                    {pair}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Direzione</Label>
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                variant={formData.direction === "long" ? "default" : "outline"}
-                size="sm"
-                className={`flex-1 ${formData.direction === "long" ? "bg-emerald-600" : ""}`}
-                onClick={() => setFormData((prev) => ({ ...prev, direction: "long" }))}
-                data-testid="button-direction-long"
-              >
-                Long
-              </Button>
-              <Button
-                type="button"
-                variant={formData.direction === "short" ? "default" : "outline"}
-                size="sm"
-                className={`flex-1 ${formData.direction === "short" ? "bg-red-600" : ""}`}
-                onClick={() => setFormData((prev) => ({ ...prev, direction: "short" }))}
-                data-testid="button-direction-short"
-              >
-                Short
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="target">Target</Label>
-            <Input
-              id="target"
-              type="number"
-              step="0.01"
-              placeholder="Auto"
-              value={formData.target}
-              onChange={(e) => setFormData((prev) => ({ ...prev, target: e.target.value }))}
-              className="font-mono bg-muted/30"
-              data-testid="input-target"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="stopLoss">Rischio</Label>
-            <Input
-              id="stopLoss"
-              type="number"
-              step="0.01"
-              placeholder="1.00"
-              value={formData.stopLoss}
-              onChange={(e) => handleRiskChange(e.target.value)}
-              className="font-mono bg-muted/30"
-              data-testid="input-stop-loss"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted/20 rounded-lg border border-border/50">
-          <div className="space-y-2">
-            <Label htmlFor="slPips" className="text-xs uppercase text-muted-foreground">SL (pips)</Label>
-            <Input
-              id="slPips"
-              type="number"
-              step="0.1"
-              placeholder="es. 10"
-              value={formData.slPips}
-              onChange={(e) => handleSlPipsChange(e.target.value)}
-              className="font-mono"
-              data-testid="input-sl-pips"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tpPips" className="text-xs uppercase text-muted-foreground">TP (pips)</Label>
-            <Input
-              id="tpPips"
-              type="number"
-              step="0.1"
-              placeholder="es. 30"
-              value={formData.tpPips}
-              onChange={(e) => handleTpPipsChange(e.target.value)}
-              className="font-mono"
-              data-testid="input-tp-pips"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="rr" className="text-xs uppercase text-muted-foreground">RR Matematico</Label>
-            <Input
-              id="rr"
-              type="number"
-              readOnly
-              value={formData.rr}
-              className="font-mono bg-background border-dashed text-muted-foreground"
-              data-testid="input-rr"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>Risultato</Label>
-            <div className="flex gap-1">
-              {(["target", "stop_loss", "breakeven"] as const).map((result) => (
-                <Button
-                  key={result}
-                  type="button"
-                  variant={formData.result === result ? "default" : "outline"}
-                  size="sm"
-                  className={`flex-1 ${
-                    formData.result === result
-                      ? result === "target"
-                        ? "bg-emerald-600"
-                        : result === "stop_loss"
-                        ? "bg-red-600"
-                        : "bg-yellow-600"
-                      : ""
-                  }`}
-                  onClick={() => setFormData((prev) => ({ ...prev, result }))}
-                  data-testid={`button-result-${result}`}
-                >
-                  {result === "target" ? "Target" : result === "stop_loss" ? "Stop" : "BE"}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="emotion">Emozione</Label>
-            <Select
-              value={formData.emotion}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, emotion: value }))}
-            >
-              <SelectTrigger id="emotion" data-testid="select-emotion">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EMOTIONS.map((emotion) => (
-                  <SelectItem key={emotion} value={emotion}>
-                    {emotion}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <Label>Confluenze PRO</Label>
-            <div className="flex flex-wrap gap-2">
-              {formData.confluencesPro.map((tag) => (
-                <ConfluenceTag
-                  key={tag}
-                  label={tag}
-                  type="pro"
-                  onRemove={() => removeConfluence("pro", tag)}
-                />
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Select onValueChange={(v) => addConfluence("pro", v)}>
-                <SelectTrigger className="flex-1" data-testid="select-confluence-pro">
-                  <SelectValue placeholder="Aggiungi..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {defaultConfluencesPro
-                    .filter((c) => !formData.confluencesPro.includes(c))
-                    .map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-1">
-                <Input
-                  placeholder="Custom..."
-                  value={newProTag}
-                  onChange={(e) => setNewProTag(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addConfluence("pro", newProTag))}
-                  className="w-28"
-                />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() => addConfluence("pro", newProTag)}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Label>Confluenze CONTRO</Label>
-            <div className="flex flex-wrap gap-2">
-              {formData.confluencesContro.map((tag) => (
-                <ConfluenceTag
-                  key={tag}
-                  label={tag}
-                  type="contro"
-                  onRemove={() => removeConfluence("contro", tag)}
-                />
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Select onValueChange={(v) => addConfluence("contro", v)}>
-                <SelectTrigger className="flex-1" data-testid="select-confluence-contro">
-                  <SelectValue placeholder="Aggiungi..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {defaultConfluencesContro
-                    .filter((c) => !formData.confluencesContro.includes(c))
-                    .map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-1">
-                <Input
-                  placeholder="Custom..."
-                  value={newControTag}
-                  onChange={(e) => setNewControTag(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addConfluence("contro", newControTag))}
-                  className="w-28"
-                />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() => addConfluence("contro", newControTag)}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <Label htmlFor="notes">Note</Label>
-          <Textarea
-            id="notes"
-            placeholder="Analisi pre e post trade..."
-            value={formData.notes}
-            onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-            className="resize-none"
-            rows={2}
-          />
-        </div>
-
-        <div className="space-y-3">
-          <Label>Screenshot / Immagini</Label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Incolla URL immagine..."
-              value={newImageUrl}
-              onChange={(e) => setNewImageUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addImageUrl(newImageUrl))}
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              onClick={() => addImageUrl(newImageUrl)}
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
-          {formData.imageUrls.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {formData.imageUrls.map((url, index) => (
-                <div
-                  key={index}
-                  className="relative group w-20 h-20 rounded-md overflow-hidden border border-border"
-                >
-                  <img
-                    src={url}
-                    alt={`Screenshot ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%23333' width='80' height='80'/%3E%3Ctext fill='%23888' x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='10'%3EError%3C/text%3E%3C/svg%3E";
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImageUrl(url)}
-                    className="absolute top-1 right-1 p-1 rounded-full bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 pt-4">
+    <Card className="w-full max-w-4xl mx-auto border-t-4 border-t-primary shadow-lg">
+      <CardHeader className="flex flex-row items-center justify-between bg-muted/20 pb-4">
+        <CardTitle>{editingTrade ? "Modifica Operazione" : "Nuova Operazione"}</CardTitle>
+        <div className="flex gap-2">
           {editingTrade && (
-            <Button type="button" variant="outline" onClick={onCancelEdit}>
-              Annulla
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => onDuplicate(form.getValues())}><Copy className="w-4 h-4 mr-2" />Duplica</Button>
           )}
-          <Button type="submit">
-            {editingTrade ? "Salva Modifiche" : "Salva Operazione"}
-          </Button>
+          {onCancelEdit && (
+            <Button variant="ghost" size="sm" onClick={onCancelEdit}><X className="w-4 h-4 mr-2" />Annulla</Button>
+          )}
         </div>
-      </form>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsTrigger value="generale">Dati Principali</TabsTrigger>
+                <TabsTrigger value="analisi">Analisi & Confluenze</TabsTrigger>
+                <TabsTrigger value="risultato">Esito & Note</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="generale" className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <FormField control={form.control} name="date" render={({ field }) => (<FormItem><FormLabel>Data Ingresso</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="time" render={({ field }) => (<FormItem><FormLabel>Ora Ingresso</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  {/* NEW: Exit fields */}
+                  <FormField control={form.control} name="exitDate" render={({ field }) => (<FormItem><FormLabel className="text-muted-foreground">Data Uscita</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="exitTime" render={({ field }) => (<FormItem><FormLabel className="text-muted-foreground">Ora Uscita</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="pair" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Coppia</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Seleziona" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {availablePairs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  
+                  <FormField control={form.control} name="direction" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Direzione</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger className={field.value === "long" ? "text-emerald-500 font-medium" : "text-red-500 font-medium"}><SelectValue placeholder="Seleziona" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="long" className="text-emerald-500">Long (Buy)</SelectItem>
+                          <SelectItem value="short" className="text-red-500">Short (Sell)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="result" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Stato/Risultato</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Seleziona" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="non_fillato">In Corso / Pending</SelectItem>
+                          <SelectItem value="target" className="text-emerald-500">Take Profit</SelectItem>
+                          <SelectItem value="stop_loss" className="text-red-500">Stop Loss</SelectItem>
+                          <SelectItem value="breakeven" className="text-yellow-500">Breakeven</SelectItem>
+                          <SelectItem value="parziale" className="text-blue-500">Chiusura Parziale</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField control={form.control} name="target" render={({ field }) => (<FormItem><FormLabel>Target ($)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="stopLoss" render={({ field }) => (<FormItem><FormLabel>Stop Loss ($)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="pnl" render={({ field }) => (<FormItem><FormLabel className="font-bold text-primary">P&L Reale ($)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="Opzionale se aperto" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="analisi" className="space-y-6">
+                 {/* (Existing analysis fields kept essentially the same but using availableEmotions) */}
+                 <FormField control={form.control} name="emotion" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Emozione Prevalente</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Come ti sentivi?" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {availableEmotions.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <FormLabel className="text-emerald-500">Confluenze A Favore (Pro)</FormLabel>
+                    <div className="flex gap-2">
+                      <Input value={confluenceProInput} onChange={e => setConfluenceProInput(e.target.value)} placeholder="Es. Trendline..." onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addConfluence("pro"))} />
+                      <Button type="button" size="icon" onClick={() => addConfluence("pro")} className="bg-emerald-500 hover:bg-emerald-600"><Plus className="w-4 h-4" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 min-h-[40px] p-2 bg-muted/20 rounded-md">
+                      {form.watch("confluencesPro").map((tag, i) => (<ConfluenceTag key={i} text={tag} type="pro" onRemove={() => removeConfluence("pro", i)} />))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <FormLabel className="text-red-500">Confluenze Contro</FormLabel>
+                    <div className="flex gap-2">
+                      <Input value={confluenceControInput} onChange={e => setConfluenceControInput(e.target.value)} placeholder="Es. Contro trend..." onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addConfluence("contro"))} />
+                      <Button type="button" size="icon" onClick={() => addConfluence("contro")} variant="destructive"><Plus className="w-4 h-4" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 min-h-[40px] p-2 bg-muted/20 rounded-md">
+                      {form.watch("confluencesContro").map((tag, i) => (<ConfluenceTag key={i} text={tag} type="contro" onRemove={() => removeConfluence("contro", i)} />))}
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="risultato" className="space-y-4">
+                 <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Note / Diario del Trade</FormLabel><FormControl><Textarea className="min-h-[150px]" placeholder="Cosa è successo? Cosa hai imparato?" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                 <div className="space-y-2"><FormLabel>Screenshot (URL)</FormLabel><div className="flex gap-2"><Input value={imageUrlInput} onChange={e => setImageUrlInput(e.target.value)} placeholder="https://..." /><Button type="button" onClick={addImage}>Aggiungi</Button></div><div className="space-y-2 mt-2">{form.watch("imageUrls").map((url, i) => (<div key={i} className="text-xs text-muted-foreground truncate p-1 bg-muted rounded flex justify-between items-center">{url} <Button type="button" variant="ghost" size="sm" onClick={() => { const curr = form.getValues("imageUrls"); form.setValue("imageUrls", curr.filter((_, idx) => idx !== i)); }}><X className="w-3 h-3" /></Button></div>))}</div></div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end pt-4 border-t">
+              <Button type="submit" size="lg" className="w-full sm:w-auto"><Save className="w-4 h-4 mr-2" />{editingTrade ? "Aggiorna Operazione" : "Salva Operazione"}</Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
     </Card>
   );
 }
