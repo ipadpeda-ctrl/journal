@@ -75,7 +75,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
       pair: "",
       direction: "long",
       target: "",
-      stopLoss: "",
+      stopLoss: "1.00", // Default Risk
       slPips: "",
       tpPips: "",
       rr: "",
@@ -88,30 +88,66 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
     };
   };
 
-  const calculateRR = (slPips: string, tpPips: string): string => {
-    const sl = parseFloat(slPips);
-    const tp = parseFloat(tpPips);
-    if (sl > 0 && tp > 0) {
-      return (tp / sl).toFixed(2);
-    }
-    return "";
-  };
-
-  const handleSlPipsChange = (value: string) => {
-    const newRr = calculateRR(value, formData.tpPips);
-    setFormData((prev) => ({ ...prev, slPips: value, rr: newRr }));
-  };
-
-  const handleTpPipsChange = (value: string) => {
-    const newRr = calculateRR(formData.slPips, value);
-    setFormData((prev) => ({ ...prev, tpPips: value, rr: newRr }));
-  };
-
   const [formData, setFormData] = useState<TradeFormData>(getInitialFormData);
 
   useEffect(() => {
     setFormData(getInitialFormData());
   }, [editingTrade?.id]);
+
+  // Calcola RR matematico puro (TP pips / SL pips)
+  const calculateRR = (sl: string, tp: string): number => {
+    const slVal = parseFloat(sl);
+    const tpVal = parseFloat(tp);
+    if (slVal > 0 && tpVal > 0) {
+      return tpVal / slVal;
+    }
+    return 0;
+  };
+
+  // Aggiorna SL Pips e ricalcola Target basandosi sul Rischio attuale
+  const handleSlPipsChange = (value: string) => {
+    const rrValue = calculateRR(value, formData.tpPips);
+    const riskValue = parseFloat(formData.stopLoss) || 0;
+    
+    // Target = RR * Rischio
+    const newTarget = rrValue > 0 && riskValue > 0 ? (rrValue * riskValue).toFixed(2) : formData.target;
+
+    setFormData((prev) => ({ 
+      ...prev, 
+      slPips: value, 
+      rr: rrValue > 0 ? rrValue.toFixed(2) : "",
+      target: newTarget
+    }));
+  };
+
+  // Aggiorna TP Pips e ricalcola Target basandosi sul Rischio attuale
+  const handleTpPipsChange = (value: string) => {
+    const rrValue = calculateRR(formData.slPips, value);
+    const riskValue = parseFloat(formData.stopLoss) || 0;
+
+    const newTarget = rrValue > 0 && riskValue > 0 ? (rrValue * riskValue).toFixed(2) : formData.target;
+
+    setFormData((prev) => ({ 
+      ...prev, 
+      tpPips: value, 
+      rr: rrValue > 0 ? rrValue.toFixed(2) : "",
+      target: newTarget
+    }));
+  };
+
+  // Gestisce il cambio manuale del Rischio (Stop Loss R)
+  // Ricalcola il Target mantenendo costante l'RR dei pips
+  const handleRiskChange = (value: string) => {
+    const riskValue = parseFloat(value);
+    const rrValue = parseFloat(formData.rr);
+
+    let newTarget = formData.target;
+    if (!isNaN(riskValue) && !isNaN(rrValue) && rrValue > 0) {
+      newTarget = (rrValue * riskValue).toFixed(2);
+    }
+
+    setFormData((prev) => ({ ...prev, stopLoss: value, target: newTarget }));
+  };
 
   const [newProTag, setNewProTag] = useState("");
   const [newControTag, setNewControTag] = useState("");
@@ -134,13 +170,11 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // FIX: Validazione per impedire trade senza coppia
     if (!formData.pair || formData.pair.trim() === "") {
       alert("Seleziona una coppia prima di salvare.");
       return;
     }
     onSubmit?.(formData);
-    console.log("Trade submitted:", formData);
   };
 
   const addConfluence = (type: "pro" | "contro", value: string) => {
@@ -249,42 +283,42 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="target">Target (R)</Label>
+            <Label htmlFor="target">Target</Label>
             <Input
               id="target"
               type="number"
               step="0.01"
-              placeholder="1.00"
+              placeholder="Auto"
               value={formData.target}
               onChange={(e) => setFormData((prev) => ({ ...prev, target: e.target.value }))}
-              className="font-mono"
+              className="font-mono bg-muted/30"
               data-testid="input-target"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="stopLoss">Stop Loss (R)</Label>
+            <Label htmlFor="stopLoss">Rischio</Label>
             <Input
               id="stopLoss"
               type="number"
               step="0.01"
               placeholder="1.00"
               value={formData.stopLoss}
-              onChange={(e) => setFormData((prev) => ({ ...prev, stopLoss: e.target.value }))}
-              className="font-mono"
+              onChange={(e) => handleRiskChange(e.target.value)}
+              className="font-mono bg-muted/30"
               data-testid="input-stop-loss"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted/20 rounded-lg border border-border/50">
           <div className="space-y-2">
-            <Label htmlFor="slPips">SL (pips)</Label>
+            <Label htmlFor="slPips" className="text-xs uppercase text-muted-foreground">SL (pips)</Label>
             <Input
               id="slPips"
               type="number"
               step="0.1"
-              placeholder="20"
+              placeholder="es. 10"
               value={formData.slPips}
               onChange={(e) => handleSlPipsChange(e.target.value)}
               className="font-mono"
@@ -293,12 +327,12 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tpPips">TP (pips)</Label>
+            <Label htmlFor="tpPips" className="text-xs uppercase text-muted-foreground">TP (pips)</Label>
             <Input
               id="tpPips"
               type="number"
               step="0.1"
-              placeholder="40"
+              placeholder="es. 30"
               value={formData.tpPips}
               onChange={(e) => handleTpPipsChange(e.target.value)}
               className="font-mono"
@@ -307,15 +341,13 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="rr">RR (auto)</Label>
+            <Label htmlFor="rr" className="text-xs uppercase text-muted-foreground">RR Matematico</Label>
             <Input
               id="rr"
               type="number"
-              step="0.01"
-              placeholder="2.00"
+              readOnly
               value={formData.rr}
-              onChange={(e) => setFormData((prev) => ({ ...prev, rr: e.target.value }))}
-              className="font-mono bg-muted/50"
+              className="font-mono bg-background border-dashed text-muted-foreground"
               data-testid="input-rr"
             />
           </div>
@@ -385,7 +417,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
             <div className="flex gap-2">
               <Select onValueChange={(v) => addConfluence("pro", v)}>
                 <SelectTrigger className="flex-1" data-testid="select-confluence-pro">
-                  <SelectValue placeholder="Aggiungi confluenza..." />
+                  <SelectValue placeholder="Aggiungi..." />
                 </SelectTrigger>
                 <SelectContent>
                   {defaultConfluencesPro
@@ -404,14 +436,12 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
                   onChange={(e) => setNewProTag(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addConfluence("pro", newProTag))}
                   className="w-28"
-                  data-testid="input-custom-pro-tag"
                 />
                 <Button
                   type="button"
                   size="icon"
                   variant="outline"
                   onClick={() => addConfluence("pro", newProTag)}
-                  data-testid="button-add-pro-tag"
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
@@ -434,7 +464,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
             <div className="flex gap-2">
               <Select onValueChange={(v) => addConfluence("contro", v)}>
                 <SelectTrigger className="flex-1" data-testid="select-confluence-contro">
-                  <SelectValue placeholder="Aggiungi confluenza..." />
+                  <SelectValue placeholder="Aggiungi..." />
                 </SelectTrigger>
                 <SelectContent>
                   {defaultConfluencesContro
@@ -453,14 +483,12 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
                   onChange={(e) => setNewControTag(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addConfluence("contro", newControTag))}
                   className="w-28"
-                  data-testid="input-custom-contro-tag"
                 />
                 <Button
                   type="button"
                   size="icon"
                   variant="outline"
                   onClick={() => addConfluence("contro", newControTag)}
-                  data-testid="button-add-contro-tag"
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
@@ -473,12 +501,11 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
           <Label htmlFor="notes">Note</Label>
           <Textarea
             id="notes"
-            placeholder="Aggiungi note sul trade..."
+            placeholder="Analisi pre e post trade..."
             value={formData.notes}
             onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
             className="resize-none"
             rows={2}
-            data-testid="input-notes"
           />
         </div>
 
@@ -491,14 +518,12 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
               onChange={(e) => setNewImageUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addImageUrl(newImageUrl))}
               className="flex-1"
-              data-testid="input-image-url"
             />
             <Button
               type="button"
               size="icon"
               variant="outline"
               onClick={() => addImageUrl(newImageUrl)}
-              data-testid="button-add-image"
             >
               <Plus className="w-4 h-4" />
             </Button>
@@ -522,7 +547,6 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
                     type="button"
                     onClick={() => removeImageUrl(url)}
                     className="absolute top-1 right-1 p-1 rounded-full bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
-                    data-testid={`button-remove-image-${index}`}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -534,11 +558,11 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
 
         <div className="flex justify-end gap-2 pt-4">
           {editingTrade && (
-            <Button type="button" variant="outline" onClick={onCancelEdit} data-testid="button-cancel-edit">
+            <Button type="button" variant="outline" onClick={onCancelEdit}>
               Annulla
             </Button>
           )}
-          <Button type="submit" data-testid="button-submit-trade">
+          <Button type="submit">
             {editingTrade ? "Salva Modifiche" : "Salva Operazione"}
           </Button>
         </div>
