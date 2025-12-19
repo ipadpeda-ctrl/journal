@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award, CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Loader2, Users, TrendingUp, BarChart3, ArrowUp, ArrowDown, Shield, ShieldCheck, User as UserIcon, Trophy, Medal, Award, CheckCircle2, XCircle, Clock, AlertTriangle, Filter } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
 import type { User, Trade } from "@shared/schema";
 
@@ -41,21 +41,20 @@ interface AdminTrade extends Trade { userName?: string; userEmail?: string; }
 export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const [location, setLocation] = useLocation();
+  const [filterUserId, setFilterUserId] = useState<string>("all");
 
-  // --- NAVIGAZIONE CORRETTA VERSO I NUOVI URL ---
   const handleTabChange = (tab: Tab) => {
     switch (tab) {
-      case "admin": break; // Siamo già qui
+      case "admin": break; 
       case "operations": setLocation("/operations"); break;
       case "calendario": setLocation("/calendar"); break;
       case "statistiche": setLocation("/stats"); break;
       case "diary": setLocation("/diary"); break;
       case "goals": setLocation("/goals"); break;
       case "settings": setLocation("/settings"); break;
-      default: setLocation("/"); break; // Home/Nuova operazione
+      default: setLocation("/"); break; 
     }
   };
-  // ---------------------------------------------
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
@@ -128,6 +127,9 @@ export default function AdminDashboard() {
 
   const safeUsers = Array.isArray(users) ? users : [];
   const safeTrades = Array.isArray(trades) ? trades : [];
+
+  // Filter Logic
+  const filteredTrades = safeTrades.filter(t => filterUserId === "all" || t.userId === filterUserId);
 
   const getUserStats = (userId: string) => {
     const userTrades = safeTrades.filter((t) => t.userId === userId);
@@ -269,15 +271,31 @@ export default function AdminDashboard() {
             
             <TabsContent value="trades">
               <Card>
-                <CardHeader><CardTitle>Tutte le Operazioni</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Tutte le Operazioni</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-muted-foreground" />
+                    <Select value={filterUserId} onValueChange={setFilterUserId}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Filtra per utente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tutti gli utenti</SelectItem>
+                        {safeUsers.map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.firstName} {u.lastName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader><TableRow><TableHead>Utente</TableHead><TableHead>Data</TableHead><TableHead>Coppia</TableHead><TableHead>Dir.</TableHead><TableHead className="text-right">Target</TableHead><TableHead className="text-right">Stop</TableHead><TableHead>Risultato</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {safeTrades.length === 0 ? (
+                      {filteredTrades.length === 0 ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-4">Nessun trade presente</TableCell></TableRow>
                       ) : (
-                        safeTrades.map((trade) => {
+                        filteredTrades.map((trade) => {
                           const tradeUser = safeUsers.find((u) => u.id === trade.userId);
                           return (
                             <TableRow key={trade.id}>
