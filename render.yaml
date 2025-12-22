@@ -3,7 +3,7 @@ services:
     name: trading-journal
     runtime: node
     plan: free
-    buildCommand: npm install && npm run db:push && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
