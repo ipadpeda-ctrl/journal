@@ -112,8 +112,11 @@ export async function registerRoutes(
   });
 
   // ============== SETUP ADMIN (ONE-TIME USE) ==============
+  // IMPORTANTE: Rimuovi questo endpoint dopo averlo usato!
+  // Usa: /api/setup-admin?key=TradingJournal2024Setup
   app.get("/api/setup-admin", async (req, res) => {
     try {
+      // Chiave segreta per sicurezza
       const secretKey = "TradingJournal2024Setup";
       if (req.query.key !== secretKey) {
         return res.status(403).json({ 
@@ -139,6 +142,7 @@ export async function registerRoutes(
         });
       }
 
+      // Promote to super_admin and approve
       await storage.updateUserRole(user.id, "super_admin");
       await storage.updateUserApproval(user.id, "approved");
 
@@ -258,10 +262,12 @@ export async function registerRoutes(
       return res.status(401).json({ message: "Non autenticato" });
     }
     
+    // Get full user data from database
     storage.getUser(req.user.id).then(user => {
       if (!user) {
         return res.status(404).json({ message: "Utente non trovato" });
       }
+      // Don't send password hash
       const { passwordHash, ...safeUser } = user;
       res.json(safeUser);
     }).catch(error => {
@@ -290,31 +296,6 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating capital:", error);
       res.status(500).json({ message: "Errore nell'aggiornamento del capitale" });
-    }
-  });
-
-  // NUOVA ROTTA: Update user settings (pairs, emotions, etc.)
-  app.patch("/api/auth/user", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { pairs, emotions, confluencesPro, confluencesContro } = req.body;
-      
-      const user = await storage.updateUserSettings(userId, {
-        pairs,
-        emotions,
-        confluencesPro,
-        confluencesContro
-      });
-      
-      if (user) {
-        const { passwordHash, ...safeUser } = user;
-        res.json(safeUser);
-      } else {
-        res.status(404).json({ message: "Utente non trovato" });
-      }
-    } catch (error) {
-      console.error("Error updating user settings:", error);
-      res.status(500).json({ message: "Errore nell'aggiornamento delle impostazioni" });
     }
   });
 
