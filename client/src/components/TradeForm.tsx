@@ -14,9 +14,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Plus, X, Copy, ImageIcon, Trash2 } from "lucide-react";
 import ConfluenceTag from "./ConfluenceTag";
+import { useAuth } from "@/hooks/useAuth";
 
-const PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
-const EMOTIONS = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
+// Default values as fallback if user has no custom settings
+const DEFAULT_PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "XAUUSD", "GBPJPY", "EURJPY"];
+const DEFAULT_EMOTIONS = ["Neutrale", "FOMO", "Rabbia", "Vendetta", "Speranza", "Fiducioso", "Impaziente", "Paura", "Sicuro", "Stress"];
+const DEFAULT_CONFLUENCES_PRO = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
+const DEFAULT_CONFLUENCES_CONTRO = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
 
 interface TradeFormProps {
   onSubmit?: (trade: TradeFormData) => void;
@@ -45,10 +49,15 @@ export interface TradeFormData {
   notes: string;
 }
 
-const defaultConfluencesPro = ["Trend forte", "Supporto testato", "Volume alto", "Pattern chiaro", "Livello chiave"];
-const defaultConfluencesContro = ["Notizie in arrivo", "Pattern debole", "Contro trend", "Bassa liquidità", "Orario sfavorevole"];
-
 export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCancelEdit }: TradeFormProps) {
+  const { user } = useAuth();
+  
+  // Use user settings if available, otherwise default to constants
+  const pairs = user?.pairs?.length ? user.pairs : DEFAULT_PAIRS;
+  const emotions = user?.emotions?.length ? user.emotions : DEFAULT_EMOTIONS;
+  const availableConfluencesPro = user?.confluencesPro?.length ? user.confluencesPro : DEFAULT_CONFLUENCES_PRO;
+  const availableConfluencesContro = user?.confluencesContro?.length ? user.confluencesContro : DEFAULT_CONFLUENCES_CONTRO;
+
   const getInitialFormData = (): TradeFormData => {
     if (editingTrade) {
       return {
@@ -248,7 +257,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
                 <SelectValue placeholder="Seleziona" />
               </SelectTrigger>
               <SelectContent>
-                {PAIRS.map((pair) => (
+                {pairs.map((pair) => (
                   <SelectItem key={pair} value={pair}>
                     {pair}
                   </SelectItem>
@@ -402,7 +411,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {EMOTIONS.map((emotion) => (
+                {emotions.map((emotion) => (
                   <SelectItem key={emotion} value={emotion}>
                     {emotion}
                   </SelectItem>
@@ -431,7 +440,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
                   <SelectValue placeholder="Aggiungi..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {defaultConfluencesPro
+                  {availableConfluencesPro
                     .filter((c) => !formData.confluencesPro.includes(c))
                     .map((c) => (
                       <SelectItem key={c} value={c}>
@@ -478,7 +487,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
                   <SelectValue placeholder="Aggiungi..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {defaultConfluencesContro
+                  {availableConfluencesContro
                     .filter((c) => !formData.confluencesContro.includes(c))
                     .map((c) => (
                       <SelectItem key={c} value={c}>

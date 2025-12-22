@@ -45,6 +45,14 @@ export default function Settings({
     setCapital(initialCapital);
   }, [initialCapital]);
 
+  // Aggiorna lo stato locale quando cambiano le props (es. caricamento iniziale)
+  useEffect(() => {
+    setPairs(initialPairs);
+    setEmotions(initialEmotions);
+    setConfluencesPro(initialConfluencesPro);
+    setConfluencesContro(initialConfluencesContro);
+  }, [initialPairs, initialEmotions, initialConfluencesPro, initialConfluencesContro]);
+
   const [newPair, setNewPair] = useState("");
   const [newEmotion, setNewEmotion] = useState("");
   const [newProConfluence, setNewProConfluence] = useState("");
@@ -61,6 +69,22 @@ export default function Settings({
     },
     onError: () => {
       toast({ title: "Errore nel salvare il capitale", variant: "destructive" });
+    },
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: SettingsData) => {
+      // Assumiamo che ci sia un endpoint generico per aggiornare l'utente o le impostazioni
+      // Se il backend si aspetta campi specifici nel body, qui li stiamo passando tutti.
+      const res = await apiRequest("PATCH", "/api/auth/user", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Impostazioni salvate con successo" });
+    },
+    onError: () => {
+      toast({ title: "Errore nel salvare le impostazioni", variant: "destructive" });
     },
   });
 
@@ -83,8 +107,12 @@ export default function Settings({
   };
 
   const handleSave = () => {
-    onSave?.({ pairs, emotions, confluencesPro, confluencesContro });
-    console.log("Settings saved:", { pairs, emotions, confluencesPro, confluencesContro });
+    const settingsData = { pairs, emotions, confluencesPro, confluencesContro };
+    // Salvataggio tramite API
+    updateSettingsMutation.mutate(settingsData);
+    // Callback opzionale per il genitore
+    onSave?.(settingsData);
+    console.log("Settings saved:", settingsData);
   };
 
   return (
@@ -272,8 +300,16 @@ export default function Settings({
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} data-testid="button-save-settings">
-          <Save className="w-4 h-4 mr-2" />
+        <Button 
+          onClick={handleSave} 
+          disabled={updateSettingsMutation.isPending}
+          data-testid="button-save-settings"
+        >
+          {updateSettingsMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 mr-2" />
+          )}
           Salva Impostazioni
         </Button>
       </div>
