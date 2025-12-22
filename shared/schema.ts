@@ -14,7 +14,6 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Session storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 export const sessions = pgTable(
   "sessions",
   {
@@ -36,6 +35,11 @@ export const users = pgTable("users", {
   role: varchar("role").notNull().default("user"), // super_admin, admin, user
   isApproved: varchar("is_approved").notNull().default("pending"), // pending, approved, rejected
   initialCapital: real("initial_capital").default(10000),
+  // Campi per le impostazioni personalizzate
+  pairs: text("pairs").array(),
+  emotions: text("emotions").array(),
+  confluencesPro: text("confluences_pro").array(),
+  confluencesContro: text("confluences_contro").array(),
   resetToken: varchar("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
