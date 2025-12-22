@@ -214,7 +214,8 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
           )}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {/* SECTION 1: GENERAL INFO (Manual) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-2">
             <Label htmlFor="date">Data</Label>
             <Input
@@ -281,80 +282,90 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
               </Button>
             </div>
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="target">Target</Label>
-            <Input
-              id="target"
-              type="number"
-              step="0.01"
-              placeholder="Auto"
-              value={formData.target}
-              onChange={(e) => setFormData((prev) => ({ ...prev, target: e.target.value }))}
-              className="font-mono bg-muted/30"
-              data-testid="input-target"
-            />
+        {/* SECTION 2: TECHNICAL PARAMETERS */}
+        <div className="p-4 bg-muted/20 rounded-lg border border-border/50 flex flex-col gap-4">
+          {/* Row A: Manual Inputs (Risk, Pips) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+             <div className="space-y-2">
+              <Label htmlFor="stopLoss">Rischio (€/$)</Label>
+              <Input
+                id="stopLoss"
+                type="number"
+                step="0.01"
+                placeholder="1.00"
+                value={formData.stopLoss}
+                onChange={(e) => handleRiskChange(e.target.value)}
+                className="font-mono bg-background"
+                data-testid="input-stop-loss"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="slPips" className="text-xs uppercase text-muted-foreground">SL (pips)</Label>
+              <Input
+                id="slPips"
+                type="number"
+                step="0.1"
+                placeholder="es. 10"
+                value={formData.slPips}
+                onChange={(e) => handleSlPipsChange(e.target.value)}
+                className="font-mono bg-background"
+                data-testid="input-sl-pips"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tpPips" className="text-xs uppercase text-muted-foreground">TP (pips)</Label>
+              <Input
+                id="tpPips"
+                type="number"
+                step="0.1"
+                placeholder="es. 30"
+                value={formData.tpPips}
+                onChange={(e) => handleTpPipsChange(e.target.value)}
+                className="font-mono bg-background"
+                data-testid="input-tp-pips"
+              />
+            </div>
           </div>
+          
+          <div className="border-t border-border/50 w-full my-1"></div>
 
-          <div className="space-y-2">
-            <Label htmlFor="stopLoss">Rischio</Label>
-            <Input
-              id="stopLoss"
-              type="number"
-              step="0.01"
-              placeholder="1.00"
-              value={formData.stopLoss}
-              onChange={(e) => handleRiskChange(e.target.value)}
-              className="font-mono bg-muted/30"
-              data-testid="input-stop-loss"
-            />
+          {/* Row B: Automated Outputs (Target, RR) - VISUALLY SEPARATED */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="target" className="text-emerald-600 font-medium">Target (Auto)</Label>
+              <Input
+                id="target"
+                type="number"
+                step="0.01"
+                placeholder="Auto"
+                value={formData.target}
+                onChange={(e) => setFormData((prev) => ({ ...prev, target: e.target.value }))}
+                className="font-mono bg-muted/50 border-emerald-500/30"
+                data-testid="input-target"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="rr" className="text-emerald-600 font-medium">RR Matematico</Label>
+              <Input
+                id="rr"
+                type="number"
+                readOnly
+                value={formData.rr}
+                className="font-mono bg-muted/50 border-emerald-500/30 text-muted-foreground"
+                data-testid="input-rr"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-muted/20 rounded-lg border border-border/50">
-          <div className="space-y-2">
-            <Label htmlFor="slPips" className="text-xs uppercase text-muted-foreground">SL (pips)</Label>
-            <Input
-              id="slPips"
-              type="number"
-              step="0.1"
-              placeholder="es. 10"
-              value={formData.slPips}
-              onChange={(e) => handleSlPipsChange(e.target.value)}
-              className="font-mono"
-              data-testid="input-sl-pips"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tpPips" className="text-xs uppercase text-muted-foreground">TP (pips)</Label>
-            <Input
-              id="tpPips"
-              type="number"
-              step="0.1"
-              placeholder="es. 30"
-              value={formData.tpPips}
-              onChange={(e) => handleTpPipsChange(e.target.value)}
-              className="font-mono"
-              data-testid="input-tp-pips"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="rr" className="text-xs uppercase text-muted-foreground">RR Matematico</Label>
-            <Input
-              id="rr"
-              type="number"
-              readOnly
-              value={formData.rr}
-              className="font-mono bg-background border-dashed text-muted-foreground"
-              data-testid="input-rr"
-            />
-          </div>
-        </div>
-
+        {/* SECTION 3: RESULT & EMOTION */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
+          <div className="space-y-2 col-span-2 md:col-span-2">
             <Label>Risultato</Label>
             <div className="flex gap-1">
               {(["target", "stop_loss", "breakeven"] as const).map((result) => (
@@ -381,7 +392,7 @@ export default function TradeForm({ onSubmit, onDuplicate, editingTrade, onCance
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 col-span-2 md:col-span-1">
             <Label htmlFor="emotion">Emozione</Label>
             <Select
               value={formData.emotion}
